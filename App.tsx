@@ -16,6 +16,10 @@ import StoreDetailScreen from './src/screens/StoreDetailScreen';
 import DistanceWalletScreen from './src/screens/DistanceWalletScreen';
 import MissionsScreen from './src/screens/MissionsScreen';
 import MyCouponsScreen from './src/screens/MyCouponsScreen';
+import RecordScreen, { RunSummary } from './src/screens/RecordScreen';
+import RecordSummaryScreen from './src/screens/RecordSummaryScreen';
+import RecordStoryScreen from './src/screens/RecordStoryScreen';
+import RecordCameraScreen from './src/screens/RecordCameraScreen';
 import { colors, font } from './src/theme';
 
 type RootStack = {
@@ -27,12 +31,19 @@ type RootStack = {
   Wallet: undefined;
   Missions: undefined;
   Coupons: undefined;
+  RecordSummary: { summary: RunSummary };
+  RecordStory: { summary: RunSummary };
+  RecordCamera: undefined;
 };
 
 type Props<T extends keyof RootStack> = NativeStackScreenProps<RootStack, T>;
+type Nav = NativeStackNavigationProp<RootStack>;
 
 const Stack = createNativeStackNavigator<RootStack>();
 const Tab = createBottomTabNavigator();
+
+// shortcut: last quest photo kept in memory only, move to app state/storage when backend lands
+let lastPhotoUri: string | undefined;
 
 const ROUTE = {
   wallet: 'Wallet',
@@ -42,7 +53,7 @@ const ROUTE = {
 } as const;
 
 function HomeTab() {
-  const nav = useNavigation<NativeStackNavigationProp<RootStack>>();
+  const nav = useNavigation<Nav>();
   return (
     <HomeScreen
       onNavigate={(target, storeId) =>
@@ -54,17 +65,25 @@ function HomeTab() {
   );
 }
 
-// shortcut: Record and Me are placeholders, replace when their designs arrive
-function Placeholder({ title }: { title: string }) {
+function RecordTab() {
+  const nav = useNavigation<Nav>();
+  return (
+    <RecordScreen
+      onFinish={summary => nav.navigate('RecordSummary', { summary })}
+      onCamera={() => nav.navigate('RecordCamera')}
+    />
+  );
+}
+
+// shortcut: Me is a placeholder, replace when its design arrives
+function MeTab() {
   return (
     <View style={styles.center}>
-      <Text style={font.title}>{title}</Text>
+      <Text style={font.title}>Me</Text>
       <Text style={font.small}>เร็วๆ นี้</Text>
     </View>
   );
 }
-const RecordTab = () => <Placeholder title="Record" />;
-const MeTab = () => <Placeholder title="Me" />;
 
 function MainTabs() {
   return (
@@ -120,12 +139,35 @@ const MissionsRoute = ({ navigation }: Props<'Missions'>) => (
 const CouponsRoute = ({ navigation }: Props<'Coupons'>) => (
   <MyCouponsScreen onBack={navigation.goBack} />
 );
+const RecordSummaryRoute = ({ navigation, route }: Props<'RecordSummary'>) => (
+  <RecordSummaryScreen
+    summary={route.params.summary}
+    onBack={navigation.goBack}
+    onStory={() => navigation.navigate('RecordStory', { summary: route.params.summary })}
+  />
+);
+const RecordStoryRoute = ({ navigation, route }: Props<'RecordStory'>) => (
+  <RecordStoryScreen
+    summary={route.params.summary}
+    photoUri={lastPhotoUri}
+    onClose={navigation.goBack}
+  />
+);
+const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => (
+  <RecordCameraScreen
+    onBack={navigation.goBack}
+    onCaptured={uri => {
+      lastPhotoUri = uri;
+      navigation.goBack();
+    }}
+  />
+);
 
 export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />
-      <SafeAreaView style={styles.root} edges={['top']}>
+      <SafeAreaView style={styles.root}>
         <NavigationContainer>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="GetStarted" component={GetStarted} />
@@ -136,6 +178,9 @@ export default function App() {
             <Stack.Screen name="Wallet" component={WalletRoute} />
             <Stack.Screen name="Missions" component={MissionsRoute} />
             <Stack.Screen name="Coupons" component={CouponsRoute} />
+            <Stack.Screen name="RecordSummary" component={RecordSummaryRoute} />
+            <Stack.Screen name="RecordStory" component={RecordStoryRoute} />
+            <Stack.Screen name="RecordCamera" component={RecordCameraRoute} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaView>
