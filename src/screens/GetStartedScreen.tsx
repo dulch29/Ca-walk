@@ -13,10 +13,16 @@ export default function GetStartedScreen({ onStart, onLogin }: Props) {
     <View style={styles.root}>
       <View style={styles.hero}>
         <Text style={styles.logo}>Cawalk</Text>
-        <Text style={styles.tagline}>เดิน · วิ่ง · สะสมระยะทาง{'\n'}แลกคูปอง</Text>
+        <Text style={styles.tagline}>
+          เดิน · วิ่ง · สะสมระยะทาง{'\n'}แลกคูปอง
+        </Text>
         <CatAvatar size={180} mood="sit" />
       </View>
-      <Pressable onPress={onStart} accessibilityRole="button" style={styles.btn}>
+      <Pressable
+        onPress={onStart}
+        accessibilityRole="button"
+        style={styles.btn}
+      >
         <Text style={styles.btnText}>เริ่มต้นใช้งาน</Text>
       </Pressable>
       <Pressable onPress={onLogin} accessibilityRole="link" hitSlop={8}>
@@ -36,9 +42,19 @@ const styles = StyleSheet.create({
     paddingBottom: space.xxl,
     gap: space.lg,
   },
-  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.lg },
+  hero: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.lg,
+  },
   logo: { ...font.title, fontSize: 40, fontWeight: '800' },
-  tagline: { ...font.body, fontSize: 16, color: colors.textMuted, textAlign: 'center' },
+  tagline: {
+    ...font.body,
+    fontSize: 16,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
   btn: {
     backgroundColor: colors.primary,
     borderRadius: radius.pill,

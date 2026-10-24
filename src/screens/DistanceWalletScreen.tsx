@@ -19,7 +19,12 @@ export default function DistanceWalletScreen({ onBack }: Props) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="ย้อนกลับ"
+          hitSlop={8}
+        >
           <Text style={font.title}>‹</Text>
         </Pressable>
         <Text style={font.title}>Distance Wallet</Text>
@@ -31,7 +36,9 @@ export default function DistanceWalletScreen({ onBack }: Props) {
         <View style={styles.track}>
           <View style={[styles.fill, { width: `${pct * 100}%` }]} />
         </View>
-        <Text style={styles.heroSmall}>เป้าหมายถัดไป {wallet.nextGoalKm} km</Text>
+        <Text style={styles.heroSmall}>
+          เป้าหมายถัดไป {wallet.nextGoalKm} km
+        </Text>
       </View>
 
       <Text style={font.h2}>สถิติรวม</Text>
@@ -76,11 +83,21 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  hero: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: space.lg, gap: space.sm },
+  hero: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    gap: space.sm,
+  },
   bigKm: { fontSize: 36, fontWeight: '800', color: colors.onPrimary },
   heroCoins: { fontSize: 18, fontWeight: '700', color: colors.onPrimary },
   heroSmall: { fontSize: 12, color: colors.onPrimary },
-  track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.primaryDark, overflow: 'hidden' },
+  track: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primaryDark,
+    overflow: 'hidden',
+  },
   fill: { height: '100%', backgroundColor: colors.onPrimary },
   statRow: { flexDirection: 'row', gap: space.sm },
   stat: {

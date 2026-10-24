@@ -47,7 +47,9 @@ export default function HomeScreen({ onNavigate }: Props) {
       >
         <CatAvatar size={120} mood={mood} />
         <Text style={styles.catHint}>
-          {mood === 'touch' ? 'เมี้ยว~ วันนี้ไปไหนกันดี?' : 'แตะเพื่อเล่นกับแมว'}
+          {mood === 'touch'
+            ? 'เมี้ยว~ วันนี้ไปไหนกันดี?'
+            : 'แตะเพื่อเล่นกับแมว'}
         </Text>
       </Pressable>
 
@@ -59,7 +61,9 @@ export default function HomeScreen({ onNavigate }: Props) {
         style={styles.search}
       >
         <Text style={font.body}>🔍</Text>
-        <Text style={[font.small, styles.flex]}>ค้นหาร้านค้า คูปอง หรือสถานที่</Text>
+        <Text style={[font.small, styles.flex]}>
+          ค้นหาร้านค้า คูปอง หรือสถานที่
+        </Text>
         <Text style={styles.explore}>Explore</Text>
       </Pressable>
 
@@ -79,22 +83,41 @@ export default function HomeScreen({ onNavigate }: Props) {
         </View>
       </Pressable>
 
-      <SectionHeader title="🎯 ภารกิจวันนี้" onMore={() => onNavigate('missions')} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
+      <SectionHeader
+        title="🎯 ภารกิจวันนี้"
+        onMore={() => onNavigate('missions')}
+      />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.hList}
+      >
         {daily.map(q => (
           <View key={q.id} style={styles.questCard}>
             <Text style={styles.questIcon}>{q.icon}</Text>
-            <Text style={font.body} numberOfLines={2}>{q.title}</Text>
-            <Text style={font.small}>{q.progress} / {q.goal} {q.unit}</Text>
+            <Text style={font.body} numberOfLines={2}>
+              {q.title}
+            </Text>
+            <Text style={font.small}>
+              {q.progress} / {q.goal} {q.unit}
+            </Text>
             <View style={styles.track}>
-              <View style={[styles.fill, { width: `${Math.min(1, q.progress / q.goal) * 100}%` }]} />
+              <View
+                style={[
+                  styles.fill,
+                  { width: `${Math.min(1, q.progress / q.goal) * 100}%` },
+                ]}
+              />
             </View>
             <Text style={styles.reward}>🪙 +{q.reward}</Text>
           </View>
         ))}
       </ScrollView>
 
-      <SectionHeader title="🎟️ คูปองของฉัน" onMore={() => onNavigate('coupons')} />
+      <SectionHeader
+        title="🎟️ คูปองของฉัน"
+        onMore={() => onNavigate('coupons')}
+      />
       {[coupons[0], coupons[3]].map(c => {
         const usable = c.status === 'usable';
         return (
@@ -112,7 +135,11 @@ export default function HomeScreen({ onNavigate }: Props) {
               accessibilityRole="button"
               style={[styles.couponBtn, !usable && styles.couponBtnOutline]}
             >
-              <Text style={usable ? styles.couponBtnText : styles.couponBtnTextOutline}>
+              <Text
+                style={
+                  usable ? styles.couponBtnText : styles.couponBtnTextOutline
+                }
+              >
                 {usable ? 'ใช้คูปอง' : 'ดูเงื่อนไข'}
               </Text>
             </Pressable>
@@ -121,7 +148,11 @@ export default function HomeScreen({ onNavigate }: Props) {
       })}
 
       <SectionHeader title="📍 ร้านค้าใกล้คุณ" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.hList}
+      >
         {stores.map(s => (
           <Pressable
             key={s.id}
@@ -134,7 +165,9 @@ export default function HomeScreen({ onNavigate }: Props) {
               <Text style={styles.questIcon}>🏪</Text>
             </View>
             <Text style={font.body}>{s.name}</Text>
-            <Text style={font.small}>📍 {s.km} km  ⭐ {s.rating}</Text>
+            <Text style={font.small}>
+              📍 {s.km} km ⭐ {s.rating}
+            </Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -142,7 +175,13 @@ export default function HomeScreen({ onNavigate }: Props) {
   );
 }
 
-function SectionHeader({ title, onMore }: { title: string; onMore?: () => void }) {
+function SectionHeader({
+  title,
+  onMore,
+}: {
+  title: string;
+  onMore?: () => void;
+}) {
   return (
     <View style={styles.rowBetween}>
       <Text style={font.h2}>{title}</Text>

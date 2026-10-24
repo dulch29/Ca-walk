@@ -28,13 +28,22 @@ export default function MissionsScreen({ onBack, onGo }: Props) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="ย้อนกลับ"
+          hitSlop={8}
+        >
           <Text style={font.title}>‹</Text>
         </Pressable>
         <Text style={font.title}>ภารกิจของฉัน</Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pills}
+      >
         {FILTERS.map(f => {
           const on = f.kind === filter;
           return (
@@ -45,7 +54,9 @@ export default function MissionsScreen({ onBack, onGo }: Props) {
               accessibilityState={{ selected: on }}
               style={[styles.pill, on && styles.pillOn]}
             >
-              <Text style={[font.small, on && styles.pillTextOn]}>{f.label}</Text>
+              <Text style={[font.small, on && styles.pillTextOn]}>
+                {f.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -61,11 +72,17 @@ export default function MissionsScreen({ onBack, onGo }: Props) {
                 <Text style={styles.timer}>เหลืออีก 12 ชม.</Text>
               </View>
               <Text style={styles.dailyTitle}>{q.title}</Text>
-              <Text style={styles.dailySmall}>{q.progress} / {q.goal} {q.unit}   🪙 +{q.reward}</Text>
+              <Text style={styles.dailySmall}>
+                {q.progress} / {q.goal} {q.unit} 🪙 +{q.reward}
+              </Text>
               <View style={styles.trackDark}>
                 <View style={[styles.fillLight, { width: pct(q) }]} />
               </View>
-              <Pressable onPress={onGo} accessibilityRole="button" style={styles.goBtn}>
+              <Pressable
+                onPress={onGo}
+                accessibilityRole="button"
+                style={styles.goBtn}
+              >
                 <Text style={styles.goText}>ไปเลย</Text>
               </Pressable>
             </View>
@@ -79,10 +96,14 @@ export default function MissionsScreen({ onBack, onGo }: Props) {
           {weekly.map(q => (
             <View key={q.id} style={styles.card}>
               <View style={styles.rowBetween}>
-                <Text style={font.body}>{q.icon} {q.title}</Text>
+                <Text style={font.body}>
+                  {q.icon} {q.title}
+                </Text>
                 <Text style={styles.coin}>🪙 +{q.reward}</Text>
               </View>
-              <Text style={font.small}>{q.progress} / {q.goal} {q.unit}</Text>
+              <Text style={font.small}>
+                {q.progress} / {q.goal} {q.unit}
+              </Text>
               <View style={styles.track}>
                 <View style={[styles.fill, { width: pct(q) }]} />
               </View>
@@ -98,7 +119,9 @@ export default function MissionsScreen({ onBack, onGo }: Props) {
             <View key={q.id} style={styles.event}>
               <CatAvatar size={72} mood="sit" />
               <View style={styles.flex}>
-                <Text style={font.h2}>{q.icon} {q.title}</Text>
+                <Text style={font.h2}>
+                  {q.icon} {q.title}
+                </Text>
                 <Text style={font.small}>{q.unit}</Text>
                 <Text style={styles.coin}>🪙 +{q.reward}</Text>
               </View>
@@ -125,8 +148,17 @@ const styles = StyleSheet.create({
   },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillTextOn: { color: colors.onPrimary, fontWeight: '700' },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dailyCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, padding: space.lg, gap: space.sm },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dailyCard: {
+    backgroundColor: colors.primaryDark,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    gap: space.sm,
+  },
   dailyIcon: { fontSize: 28 },
   timer: {
     fontSize: 11,
@@ -140,9 +172,20 @@ const styles = StyleSheet.create({
   },
   dailyTitle: { fontSize: 17, fontWeight: '700', color: colors.onPrimary },
   dailySmall: { fontSize: 12, color: colors.onPrimary },
-  trackDark: { height: 8, borderRadius: radius.pill, backgroundColor: colors.primary, overflow: 'hidden' },
+  trackDark: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    overflow: 'hidden',
+  },
   fillLight: { height: '100%', backgroundColor: colors.onPrimary },
-  goBtn: { alignSelf: 'flex-end', backgroundColor: colors.onPrimary, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  goBtn: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.onPrimary,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+  },
   goText: { fontSize: 14, fontWeight: '700', color: colors.primaryDark },
   card: {
     backgroundColor: colors.surface,
@@ -153,7 +196,12 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   coin: { fontSize: 14, fontWeight: '700', color: colors.coin },
-  track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
+  track: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
+    overflow: 'hidden',
+  },
   fill: { height: '100%', backgroundColor: colors.primary },
   event: {
     flexDirection: 'row',

@@ -21,12 +21,18 @@ export default function MyCouponsScreen({ onBack }: Props) {
   const list = coupons.filter(
     c => c.status !== 'locked' && (filter === 'all' || c.status === filter),
   );
-  const locked = filter === 'all' ? coupons.filter(c => c.status === 'locked') : [];
+  const locked =
+    filter === 'all' ? coupons.filter(c => c.status === 'locked') : [];
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="ย้อนกลับ"
+          hitSlop={8}
+        >
           <Text style={font.title}>‹</Text>
         </Pressable>
         <Text style={font.title}>คูปองของฉัน</Text>
@@ -43,7 +49,9 @@ export default function MyCouponsScreen({ onBack }: Props) {
               accessibilityState={{ selected: on }}
               style={[styles.pill, on && styles.pillOn]}
             >
-              <Text style={[font.small, on && styles.pillTextOn]}>{f.label}</Text>
+              <Text style={[font.small, on && styles.pillTextOn]}>
+                {f.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -68,11 +76,15 @@ export default function MyCouponsScreen({ onBack }: Props) {
         return (
           <View key={c.id} style={[styles.card, styles.lockedCard]}>
             <View style={styles.row}>
-              <View style={styles.thumb}><Text style={styles.thumbIcon}>🔒</Text></View>
+              <View style={styles.thumb}>
+                <Text style={styles.thumbIcon}>🔒</Text>
+              </View>
               <View style={styles.flex}>
                 <Text style={font.h2}>{c.title}</Text>
                 <Text style={font.small}>เมื่อเดินครบ {goal} km</Text>
-                <Text style={font.small}>{Math.floor(wallet.km)} / {goal} km</Text>
+                <Text style={font.small}>
+                  {Math.floor(wallet.km)} / {goal} km
+                </Text>
               </View>
             </View>
             <View style={styles.track}>
@@ -86,21 +98,40 @@ export default function MyCouponsScreen({ onBack }: Props) {
   );
 }
 
-function CouponCard({ coupon, open, onToggle }: { coupon: Coupon; open: boolean; onToggle: () => void }) {
+function CouponCard({
+  coupon,
+  open,
+  onToggle,
+}: {
+  coupon: Coupon;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const usable = coupon.status === 'usable';
   return (
     <View style={styles.card}>
       <View style={styles.row}>
-        <View style={styles.thumb}><Text style={styles.thumbIcon}>🎟️</Text></View>
+        <View style={styles.thumb}>
+          <Text style={styles.thumbIcon}>🎟️</Text>
+        </View>
         <View style={styles.flex}>
           <Text style={font.h2}>{coupon.title}</Text>
           <Text style={font.body}>📍 {coupon.store}</Text>
           <Text style={font.small}>ใช้ได้ถึง {coupon.expires}</Text>
         </View>
-        <Text style={[styles.tag, !usable && styles.tagOff]}>{usable ? 'ใช้ได้' : 'ใช้แล้ว'}</Text>
+        <Text style={[styles.tag, !usable && styles.tagOff]}>
+          {usable ? 'ใช้ได้' : 'ใช้แล้ว'}
+        </Text>
       </View>
-      <Pressable onPress={onToggle} accessibilityRole="button" accessibilityState={{ expanded: open }} style={styles.more}>
-        <Text style={styles.moreText}>{open ? 'ซ่อนรายละเอียด ˄' : 'ดูรายละเอียด ›'}</Text>
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={styles.more}
+      >
+        <Text style={styles.moreText}>
+          {open ? 'ซ่อนรายละเอียด ˄' : 'ดูรายละเอียด ›'}
+        </Text>
       </Pressable>
       {open && (
         <Text style={font.small}>
@@ -137,7 +168,14 @@ const styles = StyleSheet.create({
   },
   lockedCard: { backgroundColor: colors.surfaceMuted },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  thumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   thumbIcon: { fontSize: 24 },
   flex: { flex: 1, gap: 2 },
   tag: {
@@ -154,7 +192,12 @@ const styles = StyleSheet.create({
   tagOff: { color: colors.text, backgroundColor: colors.surfaceMuted },
   more: { alignSelf: 'flex-start' },
   moreText: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surface, overflow: 'hidden' },
+  track: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
   fill: { height: '100%', backgroundColor: colors.primary },
   cheer: { fontSize: 12, color: colors.primaryDark },
 });

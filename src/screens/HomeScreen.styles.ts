@@ -97,7 +97,11 @@ export const styles = StyleSheet.create({
   },
   couponBtnOutline: { backgroundColor: 'transparent' },
   couponBtnText: { fontSize: 13, fontWeight: '700', color: colors.onPrimary },
-  couponBtnTextOutline: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  couponBtnTextOutline: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   storeCard: {
     width: 130,
     padding: space.sm,

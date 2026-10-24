@@ -20,7 +20,12 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
     <View style={styles.root}>
       <View style={styles.top}>
         <View style={styles.header}>
-          <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="ย้อนกลับ"
+            hitSlop={8}
+          >
             <Text style={font.title}>‹</Text>
           </Pressable>
           <Text style={font.title}>Map</Text>
@@ -29,7 +34,11 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
           <Text>🔍</Text>
           <Text style={font.small}>ค้นหาร้านค้า, ประเภท, หรือแบรนด์</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pills}
+        >
           {FILTERS.map(f => {
             const on = f === filter;
             return (
@@ -58,9 +67,14 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
             accessibilityRole="button"
             accessibilityLabel={s.name}
             hitSlop={8}
-            style={[styles.pin, { left: `${s.x * 100}%`, top: `${s.y * 100}%` }]}
+            style={[
+              styles.pin,
+              { left: `${s.x * 100}%`, top: `${s.y * 100}%` },
+            ]}
           >
-            <Text style={styles.pinText}>{s.id === selectedId ? '📍' : '🟢'}</Text>
+            <Text style={styles.pinText}>
+              {s.id === selectedId ? '📍' : '🟢'}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -68,17 +82,30 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
       {selected && (
         <View style={styles.sheet}>
           <View style={styles.sheetRow}>
-            <View style={styles.thumb}><Text style={styles.pinText}>🏪</Text></View>
+            <View style={styles.thumb}>
+              <Text style={styles.pinText}>🏪</Text>
+            </View>
             <View style={styles.flex}>
               <Text style={font.h2}>{selected.name}</Text>
-              <Text style={font.small}>📍 {selected.km} km   ⭐ {selected.rating}</Text>
+              <Text style={font.small}>
+                📍 {selected.km} km ⭐ {selected.rating}
+              </Text>
               {selected.hasCoupon && <Text style={styles.badge}>มีคูปอง</Text>}
             </View>
-            <Pressable onPress={() => setSelectedId(null)} accessibilityRole="button" accessibilityLabel="ปิด" hitSlop={8}>
+            <Pressable
+              onPress={() => setSelectedId(null)}
+              accessibilityRole="button"
+              accessibilityLabel="ปิด"
+              hitSlop={8}
+            >
               <Text style={font.h2}>✕</Text>
             </Pressable>
           </View>
-          <Pressable onPress={() => onOpenStore(selected.id)} accessibilityRole="button" style={styles.btn}>
+          <Pressable
+            onPress={() => onOpenStore(selected.id)}
+            accessibilityRole="button"
+            style={styles.btn}
+          >
             <Text style={styles.btnText}>ดูรายละเอียด</Text>
           </Pressable>
         </View>
