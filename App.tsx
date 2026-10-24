@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import {
@@ -20,7 +20,13 @@ import RecordScreen, { RunSummary } from './src/screens/RecordScreen';
 import RecordSummaryScreen from './src/screens/RecordSummaryScreen';
 import RecordStoryScreen from './src/screens/RecordStoryScreen';
 import RecordCameraScreen from './src/screens/RecordCameraScreen';
-import { colors, font } from './src/theme';
+import MeScreen from './src/screens/MeScreen';
+import ProfileEditScreen from './src/screens/ProfileEditScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import ActivityHistoryScreen from './src/screens/ActivityHistoryScreen';
+import ActivityDetailScreen from './src/screens/ActivityDetailScreen';
+import CouponHistoryScreen from './src/screens/CouponHistoryScreen';
+import { colors } from './src/theme';
 
 type RootStack = {
   GetStarted: undefined;
@@ -34,6 +40,11 @@ type RootStack = {
   RecordSummary: { summary: RunSummary };
   RecordStory: { summary: RunSummary };
   RecordCamera: undefined;
+  Profile: undefined;
+  Settings: undefined;
+  History: undefined;
+  ActivityDetail: { activityId: string };
+  CouponHistory: undefined;
 };
 
 type Props<T extends keyof RootStack> = NativeStackScreenProps<RootStack, T>;
@@ -75,13 +86,15 @@ function RecordTab() {
   );
 }
 
-// shortcut: Me is a placeholder, replace when its design arrives
 function MeTab() {
+  const nav = useNavigation<Nav>();
   return (
-    <View style={styles.center}>
-      <Text style={font.title}>Me</Text>
-      <Text style={font.small}>เร็วๆ นี้</Text>
-    </View>
+    <MeScreen
+      onProfile={() => nav.navigate('Profile')}
+      onSettings={() => nav.navigate('Settings')}
+      onHistory={() => nav.navigate('History')}
+      onCouponHistory={() => nav.navigate('CouponHistory')}
+    />
   );
 }
 
@@ -102,9 +115,6 @@ function MainTabs() {
   );
 }
 
-const toMain = (navigation: Props<'Login'>['navigation']) =>
-  navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-
 const GetStarted = ({ navigation }: Props<'GetStarted'>) => (
   <GetStartedScreen
     onStart={() => navigation.navigate('Login')}
@@ -112,7 +122,9 @@ const GetStarted = ({ navigation }: Props<'GetStarted'>) => (
   />
 );
 const Login = ({ navigation }: Props<'Login'>) => (
-  <LoginScreen onDone={() => toMain(navigation)} />
+  <LoginScreen
+    onDone={() => navigation.reset({ index: 0, routes: [{ name: 'Main' }] })}
+  />
 );
 const MapRoute = ({ navigation }: Props<'Map'>) => (
   <MapScreen
@@ -143,7 +155,9 @@ const RecordSummaryRoute = ({ navigation, route }: Props<'RecordSummary'>) => (
   <RecordSummaryScreen
     summary={route.params.summary}
     onBack={navigation.goBack}
-    onStory={() => navigation.navigate('RecordStory', { summary: route.params.summary })}
+    onStory={() =>
+      navigation.navigate('RecordStory', { summary: route.params.summary })
+    }
   />
 );
 const RecordStoryRoute = ({ navigation, route }: Props<'RecordStory'>) => (
@@ -161,6 +175,32 @@ const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => (
       navigation.goBack();
     }}
   />
+);
+const ProfileRoute = ({ navigation }: Props<'Profile'>) => (
+  <ProfileEditScreen onBack={navigation.goBack} />
+);
+const SettingsRoute = ({ navigation }: Props<'Settings'>) => (
+  <SettingsScreen
+    onBack={navigation.goBack}
+    onLogout={() =>
+      navigation.reset({ index: 0, routes: [{ name: 'GetStarted' }] })
+    }
+  />
+);
+const HistoryRoute = ({ navigation }: Props<'History'>) => (
+  <ActivityHistoryScreen
+    onBack={navigation.goBack}
+    onOpen={activityId => navigation.navigate('ActivityDetail', { activityId })}
+  />
+);
+const ActivityDetailRoute = ({ navigation, route }: Props<'ActivityDetail'>) => (
+  <ActivityDetailScreen
+    activityId={route.params.activityId}
+    onBack={navigation.goBack}
+  />
+);
+const CouponHistoryRoute = ({ navigation }: Props<'CouponHistory'>) => (
+  <CouponHistoryScreen onBack={navigation.goBack} />
 );
 
 export default function App() {
@@ -181,6 +221,11 @@ export default function App() {
             <Stack.Screen name="RecordSummary" component={RecordSummaryRoute} />
             <Stack.Screen name="RecordStory" component={RecordStoryRoute} />
             <Stack.Screen name="RecordCamera" component={RecordCameraRoute} />
+            <Stack.Screen name="Profile" component={ProfileRoute} />
+            <Stack.Screen name="Settings" component={SettingsRoute} />
+            <Stack.Screen name="History" component={HistoryRoute} />
+            <Stack.Screen name="ActivityDetail" component={ActivityDetailRoute} />
+            <Stack.Screen name="CouponHistory" component={CouponHistoryRoute} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaView>
@@ -190,5 +235,4 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 });
