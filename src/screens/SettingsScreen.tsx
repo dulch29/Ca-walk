@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { colors, font, radius, space } from '../theme';
 
 type Props = {
@@ -7,9 +14,19 @@ type Props = {
   onLogout: () => void;
 };
 
-type ToggleKey = 'quest' | 'coupon' | 'cat' | 'haptic' | 'sound' | 'gps' | 'speed';
+type ToggleKey =
+  | 'quest'
+  | 'coupon'
+  | 'cat'
+  | 'haptic'
+  | 'sound'
+  | 'gps'
+  | 'speed';
 
-const SECTIONS: { title: string; rows: { key: ToggleKey; icon: string; label: string; hint?: string }[] }[] = [
+const SECTIONS: {
+  title: string;
+  rows: { key: ToggleKey; icon: string; label: string; hint?: string }[];
+}[] = [
   {
     title: 'การแจ้งเตือน',
     rows: [
@@ -28,8 +45,18 @@ const SECTIONS: { title: string; rows: { key: ToggleKey; icon: string; label: st
   {
     title: 'การบันทึกกิจกรรม',
     rows: [
-      { key: 'gps', icon: '📍', label: 'ใช้ GPS ความแม่นยำสูง', hint: 'ใช้แบตเตอรี่มากขึ้น' },
-      { key: 'speed', icon: '🛵', label: 'แจ้งเตือนความเร็วผิดปกติ', hint: 'หยุดนับเมื่อเร็วเกิน 18 km/h' },
+      {
+        key: 'gps',
+        icon: '📍',
+        label: 'ใช้ GPS ความแม่นยำสูง',
+        hint: 'ใช้แบตเตอรี่มากขึ้น',
+      },
+      {
+        key: 'speed',
+        icon: '🛵',
+        label: 'แจ้งเตือนความเร็วผิดปกติ',
+        hint: 'หยุดนับเมื่อเร็วเกิน 18 km/h',
+      },
     ],
   },
 ];
@@ -57,7 +84,12 @@ export default function SettingsScreen({ onBack, onLogout }: Props) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="ย้อนกลับ"
+          hitSlop={8}
+        >
           <Text style={font.title}>‹</Text>
         </Pressable>
         <Text style={font.title}>ตั้งค่า</Text>
@@ -101,7 +133,11 @@ export default function SettingsScreen({ onBack, onLogout }: Props) {
         </View>
       </View>
 
-      <Pressable onPress={onLogout} accessibilityRole="button" style={styles.logout}>
+      <Pressable
+        onPress={onLogout}
+        accessibilityRole="button"
+        style={styles.logout}
+      >
         <Text style={styles.logoutText}>ออกจากระบบ</Text>
       </Pressable>
     </ScrollView>
@@ -114,11 +150,30 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   section: { gap: space.sm },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.primaryDark },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: space.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, minHeight: 48 },
+  card: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: space.md,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingVertical: space.md,
+    minHeight: 48,
+  },
   divider: { borderTopWidth: 1, borderColor: colors.border },
   icon: { fontSize: 18 },
   flex: { flex: 1 },
-  logout: { paddingVertical: space.md, alignItems: 'center', borderRadius: radius.pill, borderColor: colors.danger, borderWidth: 1, backgroundColor: colors.surface },
+  logout: {
+    paddingVertical: space.md,
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderColor: colors.danger,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+  },
   logoutText: { fontSize: 16, fontWeight: '700', color: colors.danger },
 });

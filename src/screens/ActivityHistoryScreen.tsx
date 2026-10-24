@@ -23,7 +23,12 @@ export default function ActivityHistoryScreen({ onBack, onOpen }: Props) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="ย้อนกลับ"
+          hitSlop={8}
+        >
           <Text style={font.title}>‹</Text>
         </Pressable>
         <Text style={font.title}>ประวัติกิจกรรม</Text>
@@ -40,7 +45,9 @@ export default function ActivityHistoryScreen({ onBack, onOpen }: Props) {
               accessibilityState={{ selected: on }}
               style={[styles.pill, on && styles.pillOn]}
             >
-              <Text style={[font.small, on && styles.pillTextOn]}>{f.label}</Text>
+              <Text style={[font.small, on && styles.pillTextOn]}>
+                {f.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -52,7 +59,9 @@ export default function ActivityHistoryScreen({ onBack, onOpen }: Props) {
         <Text style={styles.arrow}>›</Text>
       </View>
 
-      {list.length === 0 && <Text style={[font.small, styles.empty]}>ยังไม่มีกิจกรรม</Text>}
+      {list.length === 0 && (
+        <Text style={[font.small, styles.empty]}>ยังไม่มีกิจกรรม</Text>
+      )}
 
       {list.map(a => (
         <Pressable
@@ -62,7 +71,9 @@ export default function ActivityHistoryScreen({ onBack, onOpen }: Props) {
           accessibilityLabel={`${SPORT_LABEL[a.sport]} ${a.km} km`}
           style={styles.card}
         >
-          <View style={styles.icon}><Text style={styles.iconText}>{SPORT_ICON[a.sport]}</Text></View>
+          <View style={styles.icon}>
+            <Text style={styles.iconText}>{SPORT_ICON[a.sport]}</Text>
+          </View>
           <View style={styles.flex}>
             <Text style={font.body}>{SPORT_LABEL[a.sport]}</Text>
             <Text style={styles.km}>{a.km} km</Text>
@@ -80,16 +91,62 @@ const styles = StyleSheet.create({
   content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   pills: { flexDirection: 'row', gap: space.sm },
-  pill: { paddingHorizontal: space.md, paddingVertical: space.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  pill: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillTextOn: { color: colors.onPrimary, fontWeight: '700' },
-  month: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space.sm, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.pill },
-  arrow: { fontSize: 20, fontWeight: '700', color: colors.textMuted, paddingHorizontal: space.md },
+  month: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: space.sm,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+  },
+  arrow: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textMuted,
+    paddingHorizontal: space.md,
+  },
   empty: { textAlign: 'center', marginTop: space.xl },
-  card: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md },
-  icon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.md,
+  },
+  icon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   iconText: { fontSize: 20 },
   flex: { flex: 1, gap: 2 },
   km: { fontSize: 16, fontWeight: '800', color: colors.primaryDark },
-  badge: { fontSize: 11, fontWeight: '700', color: colors.onPrimary, backgroundColor: colors.primary, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.pill, overflow: 'hidden' },
+  badge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.onPrimary,
+    backgroundColor: colors.primary,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
 });

@@ -4,6 +4,11 @@ const { View } = require('react-native');
 
 module.exports = {
   Camera: props => React.createElement(View, props),
-  useCameraPermission: () => ({ hasPermission: false, requestPermission: async () => false }),
-  usePhotoOutput: () => ({ capturePhoto: async () => ({ saveToTemporaryFileAsync: async () => '' }) }),
+  useCameraPermission: () => ({
+    hasPermission: false,
+    requestPermission: async () => false,
+  }),
+  usePhotoOutput: () => ({
+    capturePhoto: async () => ({ saveToTemporaryFileAsync: async () => '' }),
+  }),
 };

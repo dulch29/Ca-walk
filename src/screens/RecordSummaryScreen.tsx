@@ -2,7 +2,13 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import CatAvatar from '../components/CatAvatar';
 import { colors, font, radius, space } from '../theme';
-import { fmtPace, fmtTime, RunSummary, SPORT_ICON, SPORT_LABEL } from './RecordScreen';
+import {
+  fmtPace,
+  fmtTime,
+  RunSummary,
+  SPORT_ICON,
+  SPORT_LABEL,
+} from './RecordScreen';
 
 type Props = {
   summary: RunSummary;
@@ -10,7 +16,20 @@ type Props = {
   onStory: () => void;
 };
 
-const MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const MONTHS = [
+  'ม.ค.',
+  'ก.พ.',
+  'มี.ค.',
+  'เม.ย.',
+  'พ.ค.',
+  'มิ.ย.',
+  'ก.ค.',
+  'ส.ค.',
+  'ก.ย.',
+  'ต.ค.',
+  'พ.ย.',
+  'ธ.ค.',
+];
 const pad = (n: number) => String(n).padStart(2, '0');
 const hm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 // built by hand: Hermes Thai locale output is unreliable, and the app shows Buddhist Era years
@@ -19,14 +38,23 @@ export const thaiDate = (d: Date) =>
 
 export const coinsFor = (km: number) => Math.floor(km * 10);
 
-export default function RecordSummaryScreen({ summary, onBack, onStory }: Props) {
+export default function RecordSummaryScreen({
+  summary,
+  onBack,
+  onStory,
+}: Props) {
   const end = new Date();
   const start = new Date(end.getTime() - summary.seconds * 1000);
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8}>
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="ย้อนกลับ"
+          hitSlop={8}
+        >
           <Text style={font.title}>‹</Text>
         </Pressable>
         <Text style={font.title}>สรุป</Text>
@@ -46,7 +74,10 @@ export default function RecordSummaryScreen({ summary, onBack, onStory }: Props)
         </Text>
         <View style={styles.row}>
           <Stat label="ก้าว" value={summary.steps.toLocaleString()} />
-          <Stat label="Pace" value={`${fmtPace(summary.seconds, summary.km)} /km`} />
+          <Stat
+            label="Pace"
+            value={`${fmtPace(summary.seconds, summary.km)} /km`}
+          />
           <Stat label="เวลา" value={fmtTime(summary.seconds)} />
         </View>
       </View>
@@ -63,10 +94,18 @@ export default function RecordSummaryScreen({ summary, onBack, onStory }: Props)
         <Text style={styles.coins}>🪙 +{coinsFor(summary.km)}</Text>
       </View>
 
-      <Pressable onPress={onBack} accessibilityRole="button" style={styles.ghostBtn}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        style={styles.ghostBtn}
+      >
         <Text style={styles.ghostText}>ดูรายละเอียด</Text>
       </Pressable>
-      <Pressable onPress={onStory} accessibilityRole="button" style={styles.btn}>
+      <Pressable
+        onPress={onStory}
+        accessibilityRole="button"
+        style={styles.btn}
+      >
         <Text style={styles.btnText}>สร้าง Story</Text>
       </Pressable>
     </ScrollView>
@@ -94,7 +133,11 @@ const styles = StyleSheet.create({
     padding: space.lg,
     gap: space.md,
   },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   badge: {
     fontSize: 12,
     fontWeight: '700',

@@ -193,7 +193,10 @@ const HistoryRoute = ({ navigation }: Props<'History'>) => (
     onOpen={activityId => navigation.navigate('ActivityDetail', { activityId })}
   />
 );
-const ActivityDetailRoute = ({ navigation, route }: Props<'ActivityDetail'>) => (
+const ActivityDetailRoute = ({
+  navigation,
+  route,
+}: Props<'ActivityDetail'>) => (
   <ActivityDetailScreen
     activityId={route.params.activityId}
     onBack={navigation.goBack}
@@ -224,7 +227,10 @@ export default function App() {
             <Stack.Screen name="Profile" component={ProfileRoute} />
             <Stack.Screen name="Settings" component={SettingsRoute} />
             <Stack.Screen name="History" component={HistoryRoute} />
-            <Stack.Screen name="ActivityDetail" component={ActivityDetailRoute} />
+            <Stack.Screen
+              name="ActivityDetail"
+              component={ActivityDetailRoute}
+            />
             <Stack.Screen name="CouponHistory" component={CouponHistoryRoute} />
           </Stack.Navigator>
         </NavigationContainer>

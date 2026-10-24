@@ -23,6 +23,8 @@
     "react-native": "0.88.0",
     "react-native-geolocation-service": "^5.3.1",
     "react-native-haptic-feedback": "^3.0.0",
+    "react-native-nitro-image": "^0.15.2",
+    "react-native-nitro-modules": "^0.37.0",
     "react-native-qrcode-svg": "^6.3.27",
     "react-native-safe-area-context": "^5.10.1",
     "react-native-screens": "^4.30.0",

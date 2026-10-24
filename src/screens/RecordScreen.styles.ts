@@ -58,7 +58,12 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
   },
-  timer: { fontSize: 40, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+  timer: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+  },
   status: { fontSize: 13, fontWeight: '700', color: colors.primary },
   statusPaused: { color: colors.danger },
   stats: {

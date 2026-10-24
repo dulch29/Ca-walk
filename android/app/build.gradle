@@ -120,4 +120,7 @@ dependencies {
     }
 }
 
-apply plugin: 'com.google.gms.google-services'
+// skip when the Firebase config is absent so frontend-only test builds still compile
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}

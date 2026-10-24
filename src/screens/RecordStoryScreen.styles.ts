@@ -49,7 +49,13 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
   },
   // static PNG cat stamped on the user's photo (doc: no GIF in shared images)
-  catStamp: { position: 'absolute', right: 6, bottom: 6, width: 72, height: 72 },
+  catStamp: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 72,
+    height: 72,
+  },
   caption: { ...font.h2, textAlign: 'center' },
   meta: { alignSelf: 'flex-start', gap: space.xs, paddingHorizontal: space.lg },
   bubble: {

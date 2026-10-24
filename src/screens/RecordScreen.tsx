@@ -5,7 +5,12 @@ import { font } from '../theme';
 import { styles } from './RecordScreen.styles';
 
 export type Sport = 'walk' | 'run';
-export type RunSummary = { sport: Sport; seconds: number; km: number; steps: number };
+export type RunSummary = {
+  sport: Sport;
+  seconds: number;
+  km: number;
+  steps: number;
+};
 
 type Phase = 'idle' | 'pick' | 'ready' | 'recording' | 'paused';
 
@@ -76,10 +81,15 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
 
       {active && (
         <View style={styles.timerCard}>
-          <Text style={[styles.status, phase === 'paused' && styles.statusPaused]}>
+          <Text
+            style={[styles.status, phase === 'paused' && styles.statusPaused]}
+          >
             {phase === 'paused' ? '⏸ หยุดชั่วคราว' : '● กำลังบันทึก...'}
           </Text>
-          <Text style={styles.timer} accessibilityLabel={`เวลา ${fmtTime(seconds)}`}>
+          <Text
+            style={styles.timer}
+            accessibilityLabel={`เวลา ${fmtTime(seconds)}`}
+          >
             {fmtTime(seconds)}
           </Text>
         </View>
@@ -102,7 +112,13 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
         </View>
         <CatAvatar
           size={110}
-          mood={phase === 'recording' ? 'walk' : phase === 'paused' ? 'sleep' : 'sit'}
+          mood={
+            phase === 'recording'
+              ? 'walk'
+              : phase === 'paused'
+              ? 'sleep'
+              : 'sit'
+          }
         />
       </View>
 
@@ -120,7 +136,13 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
       {phase === 'pick' && (
         <View style={styles.controls}>
           {(['walk', 'run'] as Sport[]).map(s => (
-            <Ctrl key={s} label={SPORT_LABEL[s]} icon={SPORT_ICON[s]} on={sport === s} onPress={() => choose(s)} />
+            <Ctrl
+              key={s}
+              label={SPORT_LABEL[s]}
+              icon={SPORT_ICON[s]}
+              on={sport === s}
+              onPress={() => choose(s)}
+            />
           ))}
         </View>
       )}
@@ -136,7 +158,8 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
             onPress={() => (sport ? setPhase('recording') : setPhase('pick'))}
             accessibilityRole="button"
             accessibilityLabel="เริ่ม"
-            style={[styles.big, !sport && styles.bigDisabled]}>
+            style={[styles.big, !sport && styles.bigDisabled]}
+          >
             <Text style={styles.pauseText}>เริ่ม</Text>
           </Pressable>
           <Ctrl label="กล้อง" icon="📷" onPress={onCamera} />
@@ -149,14 +172,16 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
             onPress={() => setPhase('paused')}
             accessibilityRole="button"
             accessibilityLabel="หยุดชั่วคราว"
-            style={styles.pausePill}>
+            style={styles.pausePill}
+          >
             <Text style={styles.pauseText}>⏸ หยุดชั่วคราว</Text>
           </Pressable>
           <Pressable
             onPress={onCamera}
             accessibilityRole="button"
             accessibilityLabel="กล้อง"
-            style={styles.camSquare}>
+            style={styles.camSquare}
+          >
             <Text style={styles.icon}>📷</Text>
           </Pressable>
         </View>
@@ -164,7 +189,12 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
 
       {phase === 'paused' && (
         <View style={styles.controls}>
-          <Ctrl label="ไปต่อ" icon="▶" on onPress={() => setPhase('recording')} />
+          <Ctrl
+            label="ไปต่อ"
+            icon="▶"
+            on
+            onPress={() => setPhase('recording')}
+          />
           <Ctrl label="จบ" icon="■" danger onPress={finish} />
         </View>
       )}
@@ -172,7 +202,15 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
   );
 }
 
-function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
+function Stat({
+  label,
+  value,
+  unit,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+}) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{value}</Text>
@@ -196,8 +234,11 @@ function Ctrl({ label, icon, on, danger, onPress }: CtrlProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={styles.ctrl}>
-      <View style={[styles.round, on && styles.roundOn, danger && styles.finish]}>
+      style={styles.ctrl}
+    >
+      <View
+        style={[styles.round, on && styles.roundOn, danger && styles.finish]}
+      >
         <Text style={filled ? styles.iconOn : styles.icon}>{icon}</Text>
       </View>
       <Text style={on ? styles.labelStrong : styles.label}>{label}</Text>

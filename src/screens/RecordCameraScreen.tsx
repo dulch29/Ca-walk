@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Camera, useCameraPermission, usePhotoOutput } from 'react-native-vision-camera';
+import {
+  Camera,
+  useCameraPermission,
+  usePhotoOutput,
+} from 'react-native-vision-camera';
 import { colors, font, radius, space } from '../theme';
 
 type Props = {
@@ -31,7 +35,11 @@ export default function RecordCameraScreen({ onBack, onCaptured }: Props) {
     return (
       <View style={[styles.root, styles.center]}>
         <Text style={font.h2}>ขออนุญาตใช้กล้องเพื่อถ่ายรูปภารกิจ</Text>
-        <Pressable onPress={requestPermission} accessibilityRole="button" style={styles.btn}>
+        <Pressable
+          onPress={requestPermission}
+          accessibilityRole="button"
+          style={styles.btn}
+        >
           <Text style={styles.btnText}>อนุญาต</Text>
         </Pressable>
         <Pressable onPress={onBack} accessibilityRole="button" hitSlop={8}>
@@ -50,7 +58,13 @@ export default function RecordCameraScreen({ onBack, onCaptured }: Props) {
         outputs={[photoOutput]}
         onError={e => setError(e.message)}
       />
-      <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="ย้อนกลับ" hitSlop={8} style={styles.back}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="ย้อนกลับ"
+        hitSlop={8}
+        style={styles.back}
+      >
         <Text style={font.h2}>‹</Text>
       </Pressable>
       {error && <Text style={styles.error}>{error}</Text>}
@@ -68,7 +82,13 @@ export default function RecordCameraScreen({ onBack, onCaptured }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  center: { alignItems: 'center', justifyContent: 'center', gap: space.lg, backgroundColor: colors.bg, padding: space.xl },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.lg,
+    backgroundColor: colors.bg,
+    padding: space.xl,
+  },
   back: {
     position: 'absolute',
     top: space.lg,
@@ -103,6 +123,11 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   shutterBusy: { opacity: 0.5 },
-  btn: { backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: space.xl, paddingVertical: space.md },
+  btn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.md,
+  },
   btnText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
 });
