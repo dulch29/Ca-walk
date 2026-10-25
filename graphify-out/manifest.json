@@ -12,10 +12,10 @@
     "semantic_hash": "0b97c6e850da3e507a09b2ba38b291e2"
   },
   "App.tsx": {
-    "mtime": 1792851548.0544589,
-    "seen": 1792868841.0756207,
-    "ast_hash": "ad7cab6af59c7db4cbd69f6f585e6d9d",
-    "semantic_hash": "ad7cab6af59c7db4cbd69f6f585e6d9d"
+    "mtime": 1792881396.805398,
+    "seen": 1792893606.858914,
+    "ast_hash": "3b2480a1cbf2f27f7a863b97ae525070",
+    "semantic_hash": "3b2480a1cbf2f27f7a863b97ae525070"
   },
   "__tests__/App.test.tsx": {
     "mtime": 1792851548.0952928,
@@ -24,10 +24,10 @@
     "semantic_hash": "e2d2f106c044b6461f8e15f04c81f062"
   },
   "android/app/build.gradle": {
-    "mtime": 1792858820.33478,
-    "seen": 1792868841.0756228,
-    "ast_hash": "bf0b9082b805754254bd5e41e7564fba",
-    "semantic_hash": "bf0b9082b805754254bd5e41e7564fba"
+    "mtime": 1792881396.8270178,
+    "seen": 1792893606.8589237,
+    "ast_hash": "cf0e5a9e22fe2b06486171af4298dad9",
+    "semantic_hash": "cf0e5a9e22fe2b06486171af4298dad9"
   },
   "android/app/src/main/java/com/cawalk.app/MainActivity.kt": {
     "mtime": 1792851547.9129527,
@@ -42,8 +42,8 @@
     "semantic_hash": "331f72564ca8280c344dba1955dceddb"
   },
   "android/build.gradle": {
-    "mtime": 1792852554.7292864,
-    "seen": 1792868841.0756252,
+    "mtime": 1792886565.0826304,
+    "seen": 1792893606.858928,
     "ast_hash": "8186baa1edb5e5f48d747c7b04ce7fea",
     "semantic_hash": "8186baa1edb5e5f48d747c7b04ce7fea"
   },
@@ -78,10 +78,10 @@
     "semantic_hash": "ade3b5e3abc75237f168c020a9a63176"
   },
   "jest.config.js": {
-    "mtime": 1792851548.1741812,
-    "seen": 1792868841.0756297,
-    "ast_hash": "814507ada281efe2e5aab306ea5861e9",
-    "semantic_hash": "814507ada281efe2e5aab306ea5861e9"
+    "mtime": 1792881396.8315222,
+    "seen": 1792893606.8589365,
+    "ast_hash": "0407ef6a504e397453f4378baf200126",
+    "semantic_hash": "0407ef6a504e397453f4378baf200126"
   },
   "metro.config.js": {
     "mtime": 1792851548.1957211,
@@ -90,10 +90,10 @@
     "semantic_hash": "0783b3967cccd36a5178af469efd5e1e"
   },
   "package.json": {
-    "mtime": 1792858809.57113,
-    "seen": 1792868841.0756314,
-    "ast_hash": "47ff6234d14ff222f102c0555e7e58b2",
-    "semantic_hash": "47ff6234d14ff222f102c0555e7e58b2"
+    "mtime": 1792882243.457413,
+    "seen": 1792893606.8589392,
+    "ast_hash": "edac7943444d3d2c45d81f8a2410f4dd",
+    "semantic_hash": "edac7943444d3d2c45d81f8a2410f4dd"
   },
   "src/services/locationUtils.ts": {
     "mtime": 1792867862.5936284,
@@ -580,5 +580,251 @@
     "seen": 1792868841.0756905,
     "ast_hash": "250b231d6a4989ba507ae9b02db6b0dd",
     "semantic_hash": "250b231d6a4989ba507ae9b02db6b0dd"
+  },
+  "__mocks__/react-native-share.js": {
+    "mtime": 1792881396.8105748,
+    "seen": 1792893606.8589158,
+    "ast_hash": "2adad0f2cd7d7ccb54ee61239ef66be9",
+    "semantic_hash": "2adad0f2cd7d7ccb54ee61239ef66be9"
+  },
+  "__mocks__/react-native-view-shot.js": {
+    "mtime": 1792881396.8165987,
+    "seen": 1792893606.8589172,
+    "ast_hash": "b217eb6ac0947d614f2dc43bf945a74e",
+    "semantic_hash": "b217eb6ac0947d614f2dc43bf945a74e"
+  },
+  "__mocks__/react-native-vision-camera.js": {
+    "mtime": 1792881396.8210075,
+    "seen": 1792893606.8589182,
+    "ast_hash": "b0c434b4c929e5079d5de52a20b597aa",
+    "semantic_hash": "b0c434b4c929e5079d5de52a20b597aa"
+  },
+  "__tests__/firebaseService.test.ts": {
+    "mtime": 1792884492.5245085,
+    "seen": 1792893606.8589213,
+    "ast_hash": "b17d2cab9b9adab6ced609a8e8f82871",
+    "semantic_hash": "b17d2cab9b9adab6ced609a8e8f82871"
+  },
+  "__tests__/firestoreService.test.ts": {
+    "mtime": 1792884375.1319816,
+    "seen": 1792893606.8589225,
+    "ast_hash": "8b2816713e97399d980d8e4a6361011f",
+    "semantic_hash": "8b2816713e97399d980d8e4a6361011f"
+  },
+  "firebase.json": {
+    "mtime": 1792884375.130811,
+    "seen": 1792893606.8589349,
+    "ast_hash": "9cfd44d4aeb4b24cd709af3e42a6fc12",
+    "semantic_hash": "9cfd44d4aeb4b24cd709af3e42a6fc12"
+  },
+  "react-native.config.js": {
+    "mtime": 1792886184.3501952,
+    "seen": 1792893606.85894,
+    "ast_hash": "b982302e9d0f411867177864b7b6e667",
+    "semantic_hash": "b982302e9d0f411867177864b7b6e667"
+  },
+  "scripts/apply-android-patches.js": {
+    "mtime": 1792887135.9288182,
+    "seen": 1792893606.8589408,
+    "ast_hash": "ce0170378d4801de65f7155c76c50e30",
+    "semantic_hash": "ce0170378d4801de65f7155c76c50e30"
+  },
+  "src/components/CatAvatar.tsx": {
+    "mtime": 1792881396.852837,
+    "seen": 1792893606.8589416,
+    "ast_hash": "0b8a618ba9d88670c92f01e8ba1a2eb7",
+    "semantic_hash": "0b8a618ba9d88670c92f01e8ba1a2eb7"
+  },
+  "src/context/AppContext.tsx": {
+    "mtime": 1792884772.3359878,
+    "seen": 1792893606.8589423,
+    "ast_hash": "5b6712a3b806270a153300dd96de68f8",
+    "semantic_hash": "5b6712a3b806270a153300dd96de68f8"
+  },
+  "src/data/meMock.ts": {
+    "mtime": 1792881396.8583486,
+    "seen": 1792893606.8589432,
+    "ast_hash": "b7e69244a82e4eb5e3de1494609f4055",
+    "semantic_hash": "b7e69244a82e4eb5e3de1494609f4055"
+  },
+  "src/data/mock.ts": {
+    "mtime": 1792881396.8623476,
+    "seen": 1792893606.858944,
+    "ast_hash": "0ecc6f619fd1b5f9b1613768fb9ae160",
+    "semantic_hash": "0ecc6f619fd1b5f9b1613768fb9ae160"
+  },
+  "src/screens/ActivityDetailScreen.tsx": {
+    "mtime": 1792881396.8678772,
+    "seen": 1792893606.8589451,
+    "ast_hash": "6a24b09c86744e754a6633fb5281c104",
+    "semantic_hash": "6a24b09c86744e754a6633fb5281c104"
+  },
+  "src/screens/ActivityHistoryScreen.tsx": {
+    "mtime": 1792881396.8678772,
+    "seen": 1792893606.8589458,
+    "ast_hash": "56336d16bc6479bb233daf2e86988d42",
+    "semantic_hash": "56336d16bc6479bb233daf2e86988d42"
+  },
+  "src/screens/CouponHistoryScreen.tsx": {
+    "mtime": 1792881396.872073,
+    "seen": 1792893606.8589468,
+    "ast_hash": "eb2a8233116ac2655882d9b960188f70",
+    "semantic_hash": "eb2a8233116ac2655882d9b960188f70"
+  },
+  "src/screens/DistanceWalletScreen.tsx": {
+    "mtime": 1792881396.8775945,
+    "seen": 1792893606.8589475,
+    "ast_hash": "815474d02fabe2188c22fb6361d25a0b",
+    "semantic_hash": "815474d02fabe2188c22fb6361d25a0b"
+  },
+  "src/screens/GetStartedScreen.tsx": {
+    "mtime": 1792881396.884115,
+    "seen": 1792893606.8589485,
+    "ast_hash": "dc2167e03a65982fdf143279367f0c12",
+    "semantic_hash": "dc2167e03a65982fdf143279367f0c12"
+  },
+  "src/screens/HomeScreen.styles.ts": {
+    "mtime": 1792881396.8881185,
+    "seen": 1792893606.8589492,
+    "ast_hash": "cbb1f0c30b85528370bb00a5171e1c00",
+    "semantic_hash": "cbb1f0c30b85528370bb00a5171e1c00"
+  },
+  "src/screens/HomeScreen.tsx": {
+    "mtime": 1792881396.894133,
+    "seen": 1792893606.8589497,
+    "ast_hash": "9530fa057f28f5a25de9df73e3f5c550",
+    "semantic_hash": "9530fa057f28f5a25de9df73e3f5c550"
+  },
+  "src/screens/LoginScreen.tsx": {
+    "mtime": 1792881396.8986475,
+    "seen": 1792893606.8589504,
+    "ast_hash": "f0d00fb48c3fe5513adf764bcf4b4c5b",
+    "semantic_hash": "f0d00fb48c3fe5513adf764bcf4b4c5b"
+  },
+  "src/screens/MapScreen.tsx": {
+    "mtime": 1792881396.9041646,
+    "seen": 1792893606.858951,
+    "ast_hash": "935bb1b8ca3e40bd9d381068b5d974bd",
+    "semantic_hash": "935bb1b8ca3e40bd9d381068b5d974bd"
+  },
+  "src/screens/MeScreen.tsx": {
+    "mtime": 1792881396.9091692,
+    "seen": 1792893606.858952,
+    "ast_hash": "9b9dc40fb965a7e92a4f9256b903fc50",
+    "semantic_hash": "9b9dc40fb965a7e92a4f9256b903fc50"
+  },
+  "src/screens/MissionsScreen.tsx": {
+    "mtime": 1792881396.9141788,
+    "seen": 1792893606.858953,
+    "ast_hash": "bb09b0ff807f982122f4362edc04bc8f",
+    "semantic_hash": "bb09b0ff807f982122f4362edc04bc8f"
+  },
+  "src/screens/MyCouponsScreen.tsx": {
+    "mtime": 1792881396.9177008,
+    "seen": 1792893606.8589537,
+    "ast_hash": "eebe1b2cf3e3fbb1a15881722d6a6cce",
+    "semantic_hash": "eebe1b2cf3e3fbb1a15881722d6a6cce"
+  },
+  "src/screens/ProfileEditScreen.tsx": {
+    "mtime": 1792881396.9226997,
+    "seen": 1792893606.8589544,
+    "ast_hash": "5aee42cb0fb2d58cbe8305b49d58ba79",
+    "semantic_hash": "5aee42cb0fb2d58cbe8305b49d58ba79"
+  },
+  "src/screens/RecordCameraScreen.tsx": {
+    "mtime": 1792881396.9282153,
+    "seen": 1792893606.8589551,
+    "ast_hash": "c0990f05330a328c3987fd80014d075c",
+    "semantic_hash": "c0990f05330a328c3987fd80014d075c"
+  },
+  "src/screens/RecordScreen.styles.ts": {
+    "mtime": 1792881396.9317157,
+    "seen": 1792893606.858956,
+    "ast_hash": "7530f1aedac92b53d5d3fc695a3348b0",
+    "semantic_hash": "7530f1aedac92b53d5d3fc695a3348b0"
+  },
+  "src/screens/RecordScreen.tsx": {
+    "mtime": 1792881396.9372263,
+    "seen": 1792893606.8589568,
+    "ast_hash": "397b43a839932cd51aa17ec2902a012c",
+    "semantic_hash": "397b43a839932cd51aa17ec2902a012c"
+  },
+  "src/screens/RecordStoryScreen.styles.ts": {
+    "mtime": 1792881396.9422228,
+    "seen": 1792893606.8589575,
+    "ast_hash": "1182abd83cac688813407cc6317b61fb",
+    "semantic_hash": "1182abd83cac688813407cc6317b61fb"
+  },
+  "src/screens/RecordStoryScreen.tsx": {
+    "mtime": 1792881396.946743,
+    "seen": 1792893606.8589582,
+    "ast_hash": "abc591e7b93ba7bc04cbce11cd6b97c1",
+    "semantic_hash": "abc591e7b93ba7bc04cbce11cd6b97c1"
+  },
+  "src/screens/RecordSummaryScreen.tsx": {
+    "mtime": 1792881396.9518425,
+    "seen": 1792893606.8589592,
+    "ast_hash": "3199a5442c6bffddaa0337405b50357b",
+    "semantic_hash": "3199a5442c6bffddaa0337405b50357b"
+  },
+  "src/screens/SettingsScreen.tsx": {
+    "mtime": 1792881396.9563484,
+    "seen": 1792893606.85896,
+    "ast_hash": "522f85d17c88ea9ed937cf36e223559b",
+    "semantic_hash": "522f85d17c88ea9ed937cf36e223559b"
+  },
+  "src/screens/StoreDetailScreen.tsx": {
+    "mtime": 1792881396.960857,
+    "seen": 1792893606.8589604,
+    "ast_hash": "425e77c3d902623d10c413dddf0f22e1",
+    "semantic_hash": "425e77c3d902623d10c413dddf0f22e1"
+  },
+  "src/services/firebase.ts": {
+    "mtime": 1792883665.0987668,
+    "seen": 1792893606.8589613,
+    "ast_hash": "2e444a4ce6d61bc8879927c00d7b1a77",
+    "semantic_hash": "2e444a4ce6d61bc8879927c00d7b1a77"
+  },
+  "src/services/firestoreService.ts": {
+    "mtime": 1792884630.890236,
+    "seen": 1792893606.858962,
+    "ast_hash": "a3eae1c679d1651a6509b110e52d350c",
+    "semantic_hash": "a3eae1c679d1651a6509b110e52d350c"
+  },
+  "src/theme.ts": {
+    "mtime": 1792881396.9653716,
+    "seen": 1792893606.8589666,
+    "ast_hash": "00c3fd6cad6ae0809b57f4adefa8ae9b",
+    "semantic_hash": "00c3fd6cad6ae0809b57f4adefa8ae9b"
+  },
+  "Docs/real-map-activity-coupons-handoff.md": {
+    "mtime": 1792892679.273682,
+    "seen": 1792893606.858972,
+    "ast_hash": "68214f615bfeea460c7eb844e5ff11d8",
+    "semantic_hash": "68214f615bfeea460c7eb844e5ff11d8"
+  },
+  "Docs/superpowers/plans/2026-10-25-firebase-backend.md": {
+    "mtime": 1792883406.969049,
+    "seen": 1792893606.858973,
+    "ast_hash": "4505631b3869d4e9f13f9bf319c7ee29",
+    "semantic_hash": "4505631b3869d4e9f13f9bf319c7ee29"
+  },
+  "Docs/superpowers/specs/2026-10-25-firebase-backend-design.md": {
+    "mtime": 1792883406.9680488,
+    "seen": 1792893606.8589737,
+    "ast_hash": "6f2ffb2c19f19e81a9a4d999a4dffe5d",
+    "semantic_hash": "6f2ffb2c19f19e81a9a4d999a4dffe5d"
+  },
+  "HANDS-OFF.md": {
+    "mtime": 1792882243.432396,
+    "seen": 1792893606.8589745,
+    "ast_hash": "896b1957beba96f900b1d86fbab6a4ae",
+    "semantic_hash": "896b1957beba96f900b1d86fbab6a4ae"
+  },
+  "android/build-output2.txt": {
+    "mtime": 1792882243.4401057,
+    "seen": 1792893606.8589764,
+    "ast_hash": "16d2db54653d9f4cff64276b63068a37",
+    "semantic_hash": "16d2db54653d9f4cff64276b63068a37"
   }
 }
