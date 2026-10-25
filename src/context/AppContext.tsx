@@ -1,0 +1,641 @@
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  MOCK_COUPONS,
+  MOCK_MERCHANTS,
+  MOCK_USER,
+  type Coordinates,
+  type Coupon,
+  type Merchant,
+  type MockUser,
+  type RunSession,
+} from '../services/mockData';
+import {
+  calculatePace,
+  calculateSpeedKmh,
+  distanceKmToSteps,
+  haversineDistanceMeters,
+  isSpeedFraud,
+  isWithinGeofence,
+  MERCHANT_GEOFENCE_METERS,
+  stepsToDistanceKm,
+} from '../services/locationUtils';
+import {
+  startMotionTracking,
+  type MotionTrackerHandle,
+  type TrackedLocation,
+} from '../services/motionTracker';
+import {
+  getCurrentFirebaseUser,
+} from '../services/firebase';
+import { saveRunActivity } from '../services/firestoreService';
+
+export type AppMode = 'user' | 'merchant';
+
+export interface ActiveRunSession {
+  sessionId: string;
+  startTime: string;
+  steps: number;
+  distanceKm: number;
+  currentPace: string;
+  durationSeconds: number;
+}
+
+export interface DistanceOperationSuccess<T> {
+  ok: true;
+  value: T;
+}
+
+export interface DistanceOperationFailure {
+  ok: false;
+  reason: string;
+}
+
+export type DistanceOperationResult<T> =
+  | DistanceOperationSuccess<T>
+  | DistanceOperationFailure;
+
+export interface AppContextValue {
+  user: MockUser;
+  runHistory: RunSession[];
+  activeSession: ActiveRunSession | null;
+  merchants: Merchant[];
+  coupons: Coupon[];
+  mode: AppMode;
+  currentLocation: Coordinates | null;
+  currentSpeedKmh: number;
+  speedFraudActive: boolean;
+  trackingError: string | null;
+  startRunSession: () => Promise<void>;
+  endRunSession: () => RunSession | null;
+  exchangeDistanceForCoupon: (
+    merchantId: string,
+  ) => DistanceOperationResult<Coupon>;
+  redeemMockCoupon: (couponId: string) => DistanceOperationResult<Coupon>;
+  addMockDistance: (km: number) => boolean;
+  toggleSpeedFraud: () => boolean;
+  warpToMerchant: (merchantId: string) => boolean;
+  setMode: (mode: AppMode) => void;
+}
+
+const cloneUser = (): MockUser => ({
+  ...MOCK_USER,
+  runHistory: MOCK_USER.runHistory.map((session) => ({ ...session })),
+});
+
+const cloneCoupons = (): Coupon[] => MOCK_COUPONS.map((coupon) => ({ ...coupon }));
+const cloneMerchants = (): Merchant[] =>
+  MOCK_MERCHANTS.map((merchant) => ({
+    ...merchant,
+    location: { ...merchant.location },
+    promotion: { ...merchant.promotion },
+    metrics: { ...merchant.metrics },
+  }));
+
+function roundDistance(distanceKm: number): number {
+  return Math.round(distanceKm * 1000) / 1000;
+}
+
+export const AppContext = createContext<AppContextValue | undefined>(undefined);
+
+export function AppProvider(
+  props: React.PropsWithChildren,
+): React.JSX.Element {
+  const [user, setUser] = useState<MockUser>(cloneUser);
+  const [runHistory, setRunHistory] = useState<RunSession[]>(() =>
+    cloneUser().runHistory,
+  );
+  const [activeSession, setActiveSession] = useState<ActiveRunSession | null>(
+    null,
+  );
+  const [merchants, setMerchants] = useState<Merchant[]>(cloneMerchants);
+  const [coupons, setCoupons] = useState<Coupon[]>(cloneCoupons);
+  const [mode, setMode] = useState<AppMode>('user');
+  const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(
+    null,
+  );
+  const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
+  const [speedFraudActive, setSpeedFraudActive] = useState(false);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
+
+  const userRef = useRef(user);
+  const runHistoryRef = useRef(runHistory);
+  const activeSessionRef = useRef<ActiveRunSession | null>(null);
+  const merchantsRef = useRef(merchants);
+  const couponsRef = useRef(coupons);
+  const currentLocationRef = useRef<Coordinates | null>(null);
+  const trackerRef = useRef<MotionTrackerHandle | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previousLocationRef = useRef<TrackedLocation | null>(null);
+  const committedMockStepsRef = useRef(0);
+  const committedMockDistanceRef = useRef(0);
+  const sessionCounterRef = useRef(0);
+  const couponCounterRef = useRef(0);
+  const fraudRef = useRef(false);
+
+  const updateUser = useCallback(
+    (updater: (previous: MockUser) => MockUser) => {
+      const next = updater(userRef.current);
+      userRef.current = next;
+      setUser(next);
+    },
+    [],
+  );
+
+  const updateActiveSession = useCallback(
+    (
+      updater: (
+        previous: ActiveRunSession | null,
+      ) => ActiveRunSession | null,
+    ) => {
+      const next = updater(activeSessionRef.current);
+      activeSessionRef.current = next;
+      setActiveSession(next);
+    },
+    [],
+  );
+
+  const handleStep = useCallback(() => {
+    updateActiveSession((previous) => {
+      if (!previous) {
+        return previous;
+      }
+      return { ...previous, steps: previous.steps + 1 };
+    });
+  }, [updateActiveSession]);
+
+  const handleLocation = useCallback(
+    (location: TrackedLocation) => {
+      const previous = previousLocationRef.current;
+      previousLocationRef.current = location;
+      currentLocationRef.current = location;
+      setCurrentLocation({
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+
+      const session = activeSessionRef.current;
+      if (!session) {
+        return;
+      }
+
+      let segmentDistanceKm = 0;
+      let segmentSpeedKmh = location.speedKmh ?? 0;
+      if (previous && location.timestamp > previous.timestamp) {
+        segmentDistanceKm =
+          haversineDistanceMeters(previous, location) / 1000;
+        const elapsedSeconds = (location.timestamp - previous.timestamp) / 1000;
+        const calculatedSpeed = calculateSpeedKmh(
+          segmentDistanceKm,
+          elapsedSeconds,
+        );
+        segmentSpeedKmh =
+          location.speedKmh === null
+            ? calculatedSpeed
+            : Math.max(location.speedKmh, calculatedSpeed);
+      }
+
+      setCurrentSpeedKmh(Number.isFinite(segmentSpeedKmh) ? segmentSpeedKmh : 0);
+      if (isSpeedFraud(segmentSpeedKmh)) {
+        fraudRef.current = true;
+        setSpeedFraudActive(true);
+        return;
+      }
+      if (fraudRef.current || segmentDistanceKm <= 0) {
+        return;
+      }
+
+      updateActiveSession((current) => {
+        if (!current) {
+          return current;
+        }
+        const distanceKm = roundDistance(current.distanceKm + segmentDistanceKm);
+        return {
+          ...current,
+          distanceKm,
+          currentPace: calculatePace(distanceKm, current.durationSeconds),
+        };
+      });
+    },
+    [updateActiveSession],
+  );
+
+  const handleTrackingError = useCallback((error: Error) => {
+    setTrackingError(error.message);
+  }, []);
+
+  const stopTracking = useCallback(() => {
+    trackerRef.current?.stop();
+    trackerRef.current = null;
+    if (timerRef.current !== null) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const startRunSession = useCallback(async () => {
+    if (activeSessionRef.current) {
+      return;
+    }
+
+    sessionCounterRef.current += 1;
+    const startTime = new Date().toISOString();
+    const nextSession: ActiveRunSession = {
+      sessionId: `run_live_${String(sessionCounterRef.current).padStart(4, '0')}`,
+      startTime,
+      steps: 0,
+      distanceKm: 0,
+      currentPace: '-- /km',
+      durationSeconds: 0,
+    };
+    committedMockStepsRef.current = 0;
+    committedMockDistanceRef.current = 0;
+    previousLocationRef.current = null;
+    fraudRef.current = false;
+    setSpeedFraudActive(false);
+    setCurrentSpeedKmh(0);
+    setTrackingError(null);
+    activeSessionRef.current = nextSession;
+    setActiveSession(nextSession);
+
+    try {
+      const tracker = await startMotionTracking({
+        onStep: handleStep,
+        onLocation: handleLocation,
+        onError: handleTrackingError,
+      });
+      // The user may end this run or unmount while Android permissions are pending.
+      if (activeSessionRef.current?.sessionId !== nextSession.sessionId) {
+        tracker.stop();
+        return;
+      }
+      trackerRef.current = tracker;
+    } catch (error) {
+      if (activeSessionRef.current?.sessionId !== nextSession.sessionId) {
+        return;
+      }
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      stopTracking();
+      const message =
+        error instanceof Error ? error.message : 'เริ่มการเดินไม่สำเร็จ';
+      setTrackingError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+
+    timerRef.current = setInterval(() => {
+      const current = activeSessionRef.current;
+      if (!current) {
+        return;
+      }
+      const durationSeconds = Math.max(
+        0,
+        Math.floor((Date.now() - Date.parse(current.startTime)) / 1000),
+      );
+      updateActiveSession((session) => {
+        if (!session) {
+          return session;
+        }
+        return {
+          ...session,
+          durationSeconds,
+          currentPace: calculatePace(session.distanceKm, durationSeconds),
+        };
+      });
+    }, 1000);
+  }, [
+    handleLocation,
+    handleStep,
+    handleTrackingError,
+    stopTracking,
+    updateActiveSession,
+  ]);
+
+  const endRunSession = useCallback((): RunSession | null => {
+    const current = activeSessionRef.current;
+    if (!current) {
+      return null;
+    }
+
+    stopTracking();
+    const endTime = new Date().toISOString();
+    const durationSeconds = Math.max(
+      current.durationSeconds,
+      Math.floor((Date.parse(endTime) - Date.parse(current.startTime)) / 1000),
+    );
+    const distanceKm = roundDistance(current.distanceKm);
+    const completed: RunSession = {
+      sessionId: current.sessionId,
+      startTime: current.startTime,
+      endTime,
+      durationSeconds,
+      steps: current.steps,
+      distanceKm,
+      averagePace: calculatePace(distanceKm, durationSeconds),
+    };
+    const newRunHistory = [...runHistoryRef.current, completed];
+    runHistoryRef.current = newRunHistory;
+    setRunHistory(newRunHistory);
+
+    const uncommittedSteps = Math.max(
+      0,
+      current.steps - committedMockStepsRef.current,
+    );
+    const uncommittedDistance = Math.max(
+      0,
+      distanceKm - committedMockDistanceRef.current,
+    );
+    updateUser((previous) => ({
+      ...previous,
+      totalSteps: previous.totalSteps + uncommittedSteps,
+      totalDistanceKm: roundDistance(
+        previous.totalDistanceKm + uncommittedDistance,
+      ),
+      redeemableDistanceKm: roundDistance(
+        previous.redeemableDistanceKm + uncommittedDistance,
+      ),
+      runHistory: newRunHistory,
+    }));
+
+    let authenticatedUser: ReturnType<typeof getCurrentFirebaseUser> = null;
+    try {
+      authenticatedUser = getCurrentFirebaseUser();
+    } catch {
+      // Firebase config is optional for the local Android prototype.
+      authenticatedUser = null;
+    }
+    if (authenticatedUser) {
+      saveRunActivity(authenticatedUser.uid, completed).catch((error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : 'บันทึกประวัติการเดินไม่สำเร็จ';
+        setTrackingError(`บันทึกประวัติการเดินไม่สำเร็จ: ${message}`);
+      });
+    }
+
+    activeSessionRef.current = null;
+    setActiveSession(null);
+    previousLocationRef.current = null;
+    committedMockStepsRef.current = 0;
+    committedMockDistanceRef.current = 0;
+    setCurrentSpeedKmh(0);
+    return completed;
+  }, [stopTracking, updateUser]);
+
+  const exchangeDistanceForCoupon = useCallback(
+    (merchantId: string): DistanceOperationResult<Coupon> => {
+      const merchant = merchantsRef.current.find(
+        (candidate) => candidate.merchantId === merchantId,
+      );
+      if (!merchant) {
+        return { ok: false, reason: 'ไม่พบร้านค้านี้' };
+      }
+      const requiredDistanceKm = merchant.promotion.requiredDistanceKm;
+      if (userRef.current.redeemableDistanceKm < requiredDistanceKm) {
+        return { ok: false, reason: 'ระยะทางสะสมสำหรับแลกคูปองไม่เพียงพอ' };
+      }
+
+      couponCounterRef.current += 1;
+      const unlockedAt = new Date();
+      const coupon: Coupon = {
+        couponId: `coupon_live_${String(couponCounterRef.current).padStart(4, '0')}`,
+        merchantId: merchant.merchantId,
+        merchantName: merchant.merchantName,
+        dealTitle: merchant.promotion.title,
+        requiredDistanceKm,
+        status: 'unlocked',
+        unlockedAt: unlockedAt.toISOString(),
+        expiresAt: new Date(
+          unlockedAt.getTime() + 72 * 60 * 60 * 1000,
+        ).toISOString(),
+        oneTimeToken: `CW-LIVE-${String(couponCounterRef.current).padStart(6, '0')}`,
+      };
+      const nextCoupons = [...couponsRef.current, coupon];
+      couponsRef.current = nextCoupons;
+      setCoupons(nextCoupons);
+      updateUser((previous) => ({
+        ...previous,
+        redeemableDistanceKm: roundDistance(
+          previous.redeemableDistanceKm - requiredDistanceKm,
+        ),
+      }));
+      return { ok: true, value: coupon };
+    },
+    [updateUser],
+  );
+
+  const redeemMockCoupon = useCallback(
+    (couponId: string): DistanceOperationResult<Coupon> => {
+      const coupon = couponsRef.current.find(
+        (candidate) => candidate.couponId === couponId,
+      );
+      if (!coupon) {
+        return { ok: false, reason: 'ไม่พบคูปองนี้' };
+      }
+      if (coupon.status !== 'unlocked') {
+        return { ok: false, reason: 'คูปองนี้ถูกใช้ไปแล้วหรือหมดอายุ' };
+      }
+      const merchant = merchantsRef.current.find(
+        (candidate) => candidate.merchantId === coupon.merchantId,
+      );
+      if (!merchant) {
+        return { ok: false, reason: 'ไม่พบร้านค้าของคูปองนี้' };
+      }
+      const location = currentLocationRef.current;
+      if (!location) {
+        return { ok: false, reason: 'ต้องอยู่ใกล้ร้านก่อนใช้คูปอง' };
+      }
+      if (
+        !isWithinGeofence(
+          location,
+          merchant.location,
+          MERCHANT_GEOFENCE_METERS,
+        )
+      ) {
+        return { ok: false, reason: 'อยู่นอกระยะ 50 เมตรจากร้านค้า' };
+      }
+
+      const redeemedCoupon: Coupon = {
+        ...coupon,
+        status: 'redeemed',
+        redeemedAt: new Date().toISOString(),
+      };
+      const nextCoupons = couponsRef.current.map((candidate) =>
+        candidate.couponId === couponId ? redeemedCoupon : candidate,
+      );
+      couponsRef.current = nextCoupons;
+      setCoupons(nextCoupons);
+      const nextMerchants = merchantsRef.current.map((candidate) =>
+        candidate.merchantId === merchant.merchantId
+          ? {
+              ...candidate,
+              metrics: {
+                walkIns: candidate.metrics.walkIns + 1,
+                redeemed: candidate.metrics.redeemed + 1,
+                feeBaht: candidate.metrics.feeBaht + 8,
+              },
+            }
+          : candidate,
+      );
+      merchantsRef.current = nextMerchants;
+      setMerchants(nextMerchants);
+      return { ok: true, value: redeemedCoupon };
+    },
+    [],
+  );
+
+  const addMockDistance = useCallback(
+    (km: number): boolean => {
+      if (
+        !Number.isFinite(km) ||
+        km <= 0 ||
+        !activeSessionRef.current ||
+        fraudRef.current
+      ) {
+        return false;
+      }
+      const steps = distanceKmToSteps(km);
+      const actualDistanceKm = stepsToDistanceKm(steps);
+      if (steps <= 0 || actualDistanceKm <= 0) {
+        return false;
+      }
+      committedMockStepsRef.current += steps;
+      committedMockDistanceRef.current = roundDistance(
+        committedMockDistanceRef.current + actualDistanceKm,
+      );
+      updateActiveSession((previous) => {
+        if (!previous) {
+          return previous;
+        }
+        const distanceKm = roundDistance(previous.distanceKm + actualDistanceKm);
+        return {
+          ...previous,
+          steps: previous.steps + steps,
+          distanceKm,
+          currentPace: calculatePace(distanceKm, previous.durationSeconds),
+        };
+      });
+      updateUser((previous) => ({
+        ...previous,
+        totalSteps: previous.totalSteps + steps,
+        totalDistanceKm: roundDistance(
+          previous.totalDistanceKm + actualDistanceKm,
+        ),
+        redeemableDistanceKm: roundDistance(
+          previous.redeemableDistanceKm + actualDistanceKm,
+        ),
+      }));
+      return true;
+    },
+    [updateActiveSession, updateUser],
+  );
+
+  const toggleSpeedFraud = useCallback((): boolean => {
+    const next = !fraudRef.current;
+    fraudRef.current = next;
+    setSpeedFraudActive(next);
+    setCurrentSpeedKmh(next ? 19 : 0);
+    if (!next) {
+      previousLocationRef.current = null;
+    }
+    return next;
+  }, []);
+
+  const warpToMerchant = useCallback((merchantId: string): boolean => {
+    const merchant = merchantsRef.current.find(
+      (candidate) => candidate.merchantId === merchantId,
+    );
+    if (!merchant) {
+      return false;
+    }
+    const warpedLocation = {
+      latitude: merchant.location.latitude + 12 / 111111,
+      longitude: merchant.location.longitude,
+    };
+    currentLocationRef.current = warpedLocation;
+    setCurrentLocation(warpedLocation);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    runHistoryRef.current = runHistory;
+  }, [runHistory]);
+
+  useEffect(() => {
+    merchantsRef.current = merchants;
+  }, [merchants]);
+
+  useEffect(() => {
+    couponsRef.current = coupons;
+  }, [coupons]);
+
+  useEffect(
+    () => () => {
+      stopTracking();
+      activeSessionRef.current = null;
+    },
+    [stopTracking],
+  );
+
+  const value = useMemo<AppContextValue>(
+    () => ({
+      user,
+      runHistory,
+      activeSession,
+      merchants,
+      coupons,
+      mode,
+      currentLocation,
+      currentSpeedKmh,
+      speedFraudActive,
+      trackingError,
+      startRunSession,
+      endRunSession,
+      exchangeDistanceForCoupon,
+      redeemMockCoupon,
+      addMockDistance,
+      toggleSpeedFraud,
+      warpToMerchant,
+      setMode,
+    }),
+    [
+      user,
+      runHistory,
+      activeSession,
+      merchants,
+      coupons,
+      mode,
+      currentLocation,
+      currentSpeedKmh,
+      speedFraudActive,
+      trackingError,
+      startRunSession,
+      endRunSession,
+      exchangeDistanceForCoupon,
+      redeemMockCoupon,
+      addMockDistance,
+      toggleSpeedFraud,
+      warpToMerchant,
+    ],
+  );
+
+  return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
+}
+
+export function useAppContext(): AppContextValue {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useAppContext ต้องถูกเรียกภายใน AppProvider');
+  }
+  return context;
+}
