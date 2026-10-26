@@ -1,265 +1,491 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useAppContext } from '../context/AppContext';
-import { stores } from '../data/mock';
-import { colors, font, radius, space } from '../theme';
+import {
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { AmazonLogo } from '../components/BrandLogos';
+import { radius } from '../theme';
 
 type Props = {
-  storeId: string;
+  storeId?: string;
   onBack: () => void;
   onGo: () => void;
 };
 
+const STORE_IMAGE = require('../../Assests/Images/store_amazon.jpg');
+
 const TABS = ['คูปอง', 'รีวิว', 'ข้อมูลร้าน'];
 
-export default function StoreDetailScreen({ storeId, onBack, onGo }: Props) {
-  const { merchants, coupons, user, exchangeDistanceForCoupon } = useAppContext();
+interface StoreCoupon {
+  id: string;
+  title: string;
+  detail: string;
+  expiry: string;
+  claimed?: boolean;
+}
+
+const DEFAULT_COUPONS: StoreCoupon[] = [
+  {
+    id: 'sc_1',
+    title: 'ส่วนลดเครื่องดื่ม 20%',
+    detail: 'เมื่อสั่งเมนูเครื่องดื่ม (ขั้นต่ำ 1 แก้ว)',
+    expiry: 'ใช้ได้ถึง 30 ก.ย. 2568',
+  },
+  {
+    id: 'sc_2',
+    title: 'ส่วนลดเครื่องดื่ม 20%',
+    detail: 'เมื่อสั่งเมนูเครื่องดื่ม (ขั้นต่ำ 1 แก้ว)',
+    expiry: 'ใช้ได้ถึง 30 ก.ย. 2568',
+  },
+];
+
+export default function StoreDetailScreen({ onBack, onGo }: Props) {
   const [tab, setTab] = useState(TABS[0]);
-  const [claimMsg, setClaimMsg] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<StoreCoupon[]>(DEFAULT_COUPONS);
 
-  const merchant = merchants.find((m) => m.merchantId === storeId);
-  const fallbackStore = stores.find((s) => s.id === storeId) ?? stores[0];
-
-  const storeName = merchant?.merchantName ?? fallbackStore.name;
-  const storeCategory = merchant?.category ?? fallbackStore.tags;
-  const promo = merchant?.promotion ?? {
-    title: 'ส่วนลดพิเศษ 20 บาท',
-    description: 'เดินสะสมระยะทางครบ 2.0 km เพื่อแลกรับสิทธิ์',
-    requiredDistanceKm: 2.0,
-  };
-
-  const hasUnlockedCoupon = coupons.some(
-    (c) => c.merchantId === (merchant?.merchantId ?? storeId) && c.status === 'unlocked',
-  );
-
-  const handleExchange = () => {
-    if (!merchant) {
-      Alert.alert('แจ้งเตือน', 'ไม่พบข้อมูลร้านค้านี้ในระบบ');
-      return;
-    }
-    const result = exchangeDistanceForCoupon(merchant.merchantId);
-    if (result.ok) {
-      setClaimMsg('🎉 แลกคูปองสำเร็จ! คูปองอยู่ในกระเป๋า My Coupons แล้ว');
-    } else {
-      setClaimMsg(`⚠️ ${result.reason}`);
-    }
+  const handleClaim = (couponId: string) => {
+    setCoupons((prev) =>
+      prev.map((c) => (c.id === couponId ? { ...c, claimed: true } : c)),
+    );
+    Alert.alert(
+      'รับคูปองสำเร็จ! 🎉',
+      'คูปองถูกเพิ่มเข้าไปใน "คูปองของฉัน" เรียบร้อยแล้ว',
+    );
   };
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.banner}>
-          <Text style={styles.bannerIcon}>🏪</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Photo Banner */}
+        <View style={styles.heroContainer}>
+          <Image source={STORE_IMAGE} style={styles.heroImage} resizeMode="cover" />
+          {/* Circular Back Button */}
           <Pressable
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="ย้อนกลับ"
-            hitSlop={8}
-            style={styles.back}
+            hitSlop={10}
+            style={styles.backCircleBtn}
           >
-            <Text style={font.h2}>‹</Text>
+            <Text style={styles.backArrow}>←</Text>
           </Pressable>
         </View>
 
-        <View style={styles.card}>
-          <Text style={font.title}>{storeName}</Text>
-          <Text style={font.small}>
-            ⭐ 4.8 (120 รีวิว) 📍 0.8 km • {storeCategory}
-          </Text>
-          <Text style={font.body}>🕒 เปิดบริการ 10:00 - 21:00</Text>
-          <Text style={font.body}>📍 ย่านบรรทัดทอง - สามย่าน กรุงเทพฯ</Text>
-          <View style={styles.balanceBadge}>
-            <Text style={styles.balanceText}>
-              👛 ระยะสะสมสำหรับแลก: {user.redeemableDistanceKm.toFixed(1)} km
-            </Text>
+        {/* Store Info Overlay Card */}
+        <View style={styles.storeCard}>
+          {/* Header Row */}
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.storeTitle}>Cafe Amazon</Text>
+            <Pressable
+              onPress={onBack}
+              accessibilityRole="button"
+              accessibilityLabel="ปิด"
+              hitSlop={10}
+              style={styles.closeBtn}
+            >
+              <Text style={styles.closeText}>✕</Text>
+            </Pressable>
           </View>
-        </View>
 
-        <View style={styles.tabs}>
-          {TABS.map((t) => {
-            const on = t === tab;
-            return (
-              <Pressable
-                key={t}
-                onPress={() => setTab(t)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                style={[styles.tab, on && styles.tabOn]}
-              >
-                <Text style={[font.body, on && styles.tabTextOn]}>{t}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+          {/* Rating & Distance */}
+          <View style={styles.metaRow}>
+            <Text style={styles.ratingText}>⭐ 4.5</Text>
+            <Text style={styles.reviewsText}>(1.2k รีวิว)</Text>
+            <Text style={styles.dotSeparator}>·</Text>
+            <Text style={styles.distanceText}>📍 1.2 km</Text>
+          </View>
 
-        {tab === 'คูปอง' ? (
-          <View style={styles.dealContainer}>
-            {claimMsg && (
-              <View style={styles.msgBanner}>
-                <Text style={styles.msgText}>{claimMsg}</Text>
-              </View>
-            )}
+          {/* Tags */}
+          <Text style={styles.tagsText}>☕ กาแฟ · เครื่องดื่ม · ขนม</Text>
 
-            <View style={styles.coupon}>
-              <View style={styles.thumb}>
-                <Text style={styles.thumbIcon}>🎟️</Text>
-              </View>
-              <View style={styles.flex}>
-                <Text style={font.h2}>{promo.title}</Text>
-                <Text style={font.small}>{promo.description}</Text>
-                <Text style={styles.reqDist}>
-                  🏃 ต้องใช้ระยะทาง: {promo.requiredDistanceKm.toFixed(1)} km
-                </Text>
-              </View>
-              <Pressable
-                onPress={handleExchange}
-                disabled={hasUnlockedCoupon}
-                accessibilityRole="button"
-                style={[styles.claim, hasUnlockedCoupon && styles.claimDone]}
-              >
-                <Text style={styles.claimText}>
-                  {hasUnlockedCoupon ? 'มีในกระเป๋าแล้ว' : 'แลกสิทธิ์'}
-                </Text>
-              </Pressable>
+          {/* Thai Description */}
+          <Text style={styles.descriptionText}>
+            สัมผัสรสชาติกาแฟสดแท้จากธรรมชาติ พร้อมเสิร์ฟความสดชื่นด้วยเครื่องดื่มหลากหลายเมนู ทั้งกาแฟ ชาเขียว และเบเกอรี่สดใหม่ทุกวัน
+          </Text>
+
+          {/* Hours & Address */}
+          <View style={styles.detailsGroup}>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailIcon}>🕒</Text>
+              <Text style={styles.detailText}>เปิด 06:00 - 22:00</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailIcon}>📍</Text>
+              <Text style={styles.detailText}>125 ถนนสุขุมวิท กรุงเทพฯ</Text>
             </View>
           </View>
-        ) : tab === 'ข้อมูลร้าน' ? (
-          <View style={styles.infoCard}>
-            <Text style={font.h2}>สถิติร้านค้า (Merchant Metrics)</Text>
-            <Text style={font.body}>
-              🚶 จำนวนคนเดินมาเยือน: {merchant?.metrics.walkIns ?? 12} ครั้ง
-            </Text>
-            <Text style={font.body}>
-              🎟️ จำนวนการแลกใช้คูปอง: {merchant?.metrics.redeemed ?? 8} ใบ
-            </Text>
-            <Text style={font.small}>
-              *ข้อมูลจำลองแบบ Client-Side สำหรับ Hackathon Demo
-            </Text>
+
+          {/* Sub-tabs Row */}
+          <View style={styles.tabsContainer}>
+            {TABS.map((t) => {
+              const active = t === tab;
+              return (
+                <Pressable
+                  key={t}
+                  onPress={() => setTab(t)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  style={[styles.tabButton, active && styles.tabButtonActive]}
+                >
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                    {t}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        ) : (
-          <Text style={[font.small, styles.empty]}>
-            ยังไม่มีรีวิวสำหรับร้านนี้ เป็นคนแรกที่รีวิวเลย!
-          </Text>
-        )}
+
+          {/* Tab Content: คูปอง */}
+          {tab === 'คูปอง' && (
+            <View style={styles.couponsList}>
+              {coupons.map((c) => (
+                <View key={c.id} style={styles.couponCard}>
+                  {/* Brand Logo */}
+                  <View style={styles.couponLogoBox}>
+                    <AmazonLogo size={52} />
+                  </View>
+
+                  {/* Middle Info */}
+                  <View style={styles.couponCenter}>
+                    <Text style={styles.couponTitle}>{c.title}</Text>
+                    <Text style={styles.couponDetail}>{c.detail}</Text>
+                    <Text style={styles.couponExpiry}>{c.expiry}</Text>
+                  </View>
+
+                  {/* Claim Button */}
+                  <Pressable
+                    onPress={() => handleClaim(c.id)}
+                    disabled={c.claimed}
+                    style={({ pressed }) => [
+                      styles.claimBtn,
+                      c.claimed && styles.claimBtnClaimed,
+                      pressed && !c.claimed && styles.btnPressed,
+                    ]}
+                  >
+                    <Text style={styles.claimBtnText}>
+                      {c.claimed ? 'รับแล้ว' : 'รับคูปอง'}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Tab Content: รีวิว */}
+          {tab === 'รีวิว' && (
+            <View style={styles.placeholderTab}>
+              <Text style={styles.placeholderText}>
+                🌟 4.5 ดาว จากลูกค้ารวม 1,248 คน
+              </Text>
+              <Text style={styles.reviewSnippet}>
+                "กาแฟรสชาติเข้มข้น พนักงานบริการดี บรรยากาศร่มรื่น เหมาะแก่การนั่งพักผ่อน"
+              </Text>
+            </View>
+          )}
+
+          {/* Tab Content: ข้อมูลร้าน */}
+          {tab === 'ข้อมูลร้าน' && (
+            <View style={styles.placeholderTab}>
+              <Text style={styles.placeholderText}>ข้อมูลร้านค้าเพิ่มเติม</Text>
+              <Text style={styles.reviewSnippet}>
+                มีที่จอดรถหน้าร้าน รองรับ Wi-Fi ฟรี และรับชำระผ่าน Ca-walk Wallet, PromptPay, และบัตรเครดิต
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      <Pressable onPress={onGo} accessibilityRole="button" style={styles.go}>
-        <Text style={styles.goText}>ไปที่แผนที่</Text>
-      </Pressable>
+      {/* Floating Bottom CTA Button */}
+      <View style={styles.bottomBar}>
+        <Pressable
+          onPress={onGo}
+          accessibilityRole="button"
+          accessibilityLabel="ไปเลย"
+          style={({ pressed }) => [styles.goButton, pressed && styles.btnPressed]}
+        >
+          <Text style={styles.goButtonText}>ไปเลย</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  content: { gap: space.md, paddingBottom: 96 },
-  banner: {
-    height: 180,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerIcon: { fontSize: 64 },
-  back: {
-    position: 'absolute',
-    top: space.lg,
-    left: space.lg,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  card: {
-    marginHorizontal: space.lg,
-    marginTop: -space.xl,
-    padding: space.lg,
-    gap: space.xs,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-  },
-  balanceBadge: {
-    marginTop: space.sm,
-    padding: space.xs,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.sm,
-  },
-  balanceText: { ...font.small, color: colors.primaryDark, fontWeight: '700' },
-  tabs: {
-    flexDirection: 'row',
-    marginHorizontal: space.lg,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.pill,
-    padding: space.xs,
-  },
-  tab: {
+  root: {
     flex: 1,
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
+    backgroundColor: '#FAF7EE',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 90,
+  },
+  heroContainer: {
+    width: '100%',
+    height: 220,
+    position: 'relative',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  backCircleBtn: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
-  tabOn: { backgroundColor: colors.surface },
-  tabTextOn: { fontWeight: '700', color: colors.text },
-  dealContainer: { gap: space.md, paddingHorizontal: space.lg },
-  msgBanner: {
-    padding: space.sm,
-    backgroundColor: colors.surface,
-    borderColor: colors.primary,
-    borderWidth: 1,
-    borderRadius: radius.md,
+  backArrow: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#262A22',
   },
-  msgText: { ...font.small, color: colors.text },
-  coupon: {
+  storeCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28,
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 24,
+    elevation: 4,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.md,
+    justifyContent: 'space-between',
   },
-  thumb: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceMuted,
+  storeTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#262A22',
+    letterSpacing: -0.4,
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  closeText: {
+    fontSize: 18,
+    color: '#A0A59B',
+    fontWeight: '600',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#C78923',
+  },
+  reviewsText: {
+    fontSize: 13,
+    color: '#70756B',
+  },
+  dotSeparator: {
+    fontSize: 14,
+    color: '#8A8F85',
+  },
+  distanceText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#55684B',
+  },
+  tagsText: {
+    fontSize: 13,
+    color: '#70756B',
+    marginTop: 6,
+  },
+  descriptionText: {
+    fontSize: 13,
+    color: '#54594E',
+    lineHeight: 20,
+    marginTop: 12,
+  },
+  detailsGroup: {
+    marginTop: 14,
+    gap: 6,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailIcon: {
+    fontSize: 14,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#4E5348',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF7EE',
+    borderRadius: radius.pill,
+    padding: 4,
+    marginTop: 20,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: radius.pill,
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
+    elevation: 2,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#8A8F85',
+  },
+  tabTextActive: {
+    fontWeight: '700',
+    color: '#262A22',
+  },
+  couponsList: {
+    marginTop: 16,
+    gap: 12,
+  },
+  couponCard: {
+    backgroundColor: '#FAF7EE',
+    borderRadius: 18,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+  },
+  couponLogoBox: {
+    marginRight: 10,
+  },
+  couponCenter: {
+    flex: 1,
+    gap: 2,
+  },
+  couponTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#262A22',
+    letterSpacing: -0.2,
+  },
+  couponDetail: {
+    fontSize: 11,
+    color: '#70756B',
+  },
+  couponExpiry: {
+    fontSize: 10,
+    color: '#959B90',
+    marginTop: 1,
+  },
+  claimBtn: {
+    backgroundColor: '#55684B',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbIcon: { fontSize: 24 },
-  flex: { flex: 1, gap: space.xs },
-  reqDist: { ...font.small, color: colors.primary, fontWeight: '700' },
-  claim: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingVertical: space.xs,
-    paddingHorizontal: space.md,
+  claimBtnClaimed: {
+    backgroundColor: '#A0A59B',
   },
-  claimDone: { backgroundColor: colors.locked },
-  claimText: { ...font.small, color: colors.onPrimary, fontWeight: '700' },
-  infoCard: {
-    marginHorizontal: space.lg,
-    padding: space.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderColor: colors.border,
-    borderWidth: 1,
-    gap: space.sm,
+  claimBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  empty: { textAlign: 'center', marginTop: space.xl },
-  go: {
+  btnPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
+  },
+  placeholderTab: {
+    marginTop: 18,
+    padding: 16,
+    backgroundColor: '#FAF7EE',
+    borderRadius: 16,
+    gap: 8,
+  },
+  placeholderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#262A22',
+  },
+  reviewSnippet: {
+    fontSize: 13,
+    color: '#70756B',
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+  bottomSpacer: {
+    height: 40,
+  },
+  bottomBar: {
     position: 'absolute',
-    bottom: space.lg,
-    left: space.lg,
-    right: space.lg,
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingVertical: space.md,
-    alignItems: 'center',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FAF7EE',
+    borderTopWidth: 1.2,
+    borderTopColor: '#ECE4D8',
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 24,
+    elevation: 10,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
   },
-  goText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
+  goButton: {
+    backgroundColor: '#55684B',
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#55684B',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  goButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
 });

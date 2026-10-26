@@ -1,194 +1,275 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  Map as MapView,
-  Camera,
-  Marker,
-  UserLocation,
-} from '@maplibre/maplibre-react-native';
-import { useAppContext } from '../context/AppContext';
-import { haversineDistanceMeters } from '../services/locationUtils';
-import { colors, font, radius, space } from '../theme';
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import { radius } from '../theme';
 
 type Props = {
   onBack: () => void;
   onOpenStore: (storeId: string) => void;
 };
 
-const FILTERS = ['ใกล้ฉัน', 'อาหาร', 'เครื่องดื่ม', 'ของหวาน'];
-const BANTADTHONG_COORDS: [number, number] = [100.5236, 13.7401]; // [lng, lat]
-const MAP_STYLE_URL = 'https://demotiles.maplibre.org/style.json';
+const STORE_AMAZON_IMG = require('../../Assests/Images/store_amazon.jpg');
+
+const FILTERS = ['ใกล้ฉัน', 'ส่วนลด', 'อาหาร & เครื่องดื่ม'];
+
+interface StoreMarker {
+  id: string;
+  name: string;
+  distance: string;
+  rating: number;
+  hasCoupon: boolean;
+  xPct: number; // 0 to 100
+  yPct: number; // 0 to 100
+}
+
+const STORE_MARKERS: StoreMarker[] = [
+  {
+    id: 's1',
+    name: 'Cafe Amazon',
+    distance: '1.2 km',
+    rating: 4.5,
+    hasCoupon: true,
+    xPct: 52,
+    yPct: 28,
+  },
+  {
+    id: 's2',
+    name: '7-Eleven',
+    distance: '0.8 km',
+    rating: 4.2,
+    hasCoupon: true,
+    xPct: 46,
+    yPct: 36,
+  },
+  {
+    id: 's3',
+    name: 'Inthanin Coffee',
+    distance: '1.5 km',
+    rating: 4.6,
+    hasCoupon: false,
+    xPct: 60,
+    yPct: 35,
+  },
+  {
+    id: 's4',
+    name: 'KFC',
+    distance: '2.1 km',
+    rating: 4.0,
+    hasCoupon: true,
+    xPct: 58,
+    yPct: 52,
+  },
+  {
+    id: 's5',
+    name: 'Chula Sweet',
+    distance: '0.5 km',
+    rating: 4.7,
+    hasCoupon: false,
+    xPct: 38,
+    yPct: 48,
+  },
+];
 
 export default function MapScreen({ onBack, onOpenStore }: Props) {
-  const { merchants, currentLocation, warpToMerchant } = useAppContext();
   const [filter, setFilter] = useState(FILTERS[0]);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    merchants[0]?.merchantId ?? null,
-  );
-  const [mapError, setMapError] = useState(false);
-
-  const filteredMerchants = merchants.filter((m) => {
-    if (filter === 'ใกล้ฉัน') {
-      return true;
-    }
-    return m.category.includes(filter);
-  });
-
-  const selected = merchants.find((m) => m.merchantId === selectedId);
-
-  const getDistanceKm = (coords: { latitude: number; longitude: number }) => {
-    if (!currentLocation) {
-      return '0.8';
-    }
-    const meters = haversineDistanceMeters(currentLocation, coords);
-    return (meters / 1000).toFixed(1);
-  };
+  const [searchText, setSearchText] = useState('');
+  const [selectedStore, setSelectedStore] = useState<StoreMarker | null>(STORE_MARKERS[0]);
 
   return (
     <View style={styles.root}>
-      <View style={styles.top}>
-        <View style={styles.header}>
+      {/* Map Canvas Background (Illustrated Vector Street Grid matching Ref) */}
+      <View style={styles.mapContainer}>
+        <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+          {/* Base ground */}
+          <Rect x="0" y="0" width="100%" height="100%" fill="#F5F2E9" />
+
+          {/* Green Parks / Blocks */}
+          <Rect x="20" y="80" width="120" height="90" rx="8" fill="#EBF2E5" />
+          <Rect x="220" y="60" width="140" height="110" rx="8" fill="#EBF2E5" />
+          <Rect x="15" y="240" width="150" height="130" rx="8" fill="#EBF2E5" />
+          <Rect x="210" y="220" width="160" height="150" rx="8" fill="#EBF2E5" />
+          <Rect x="30" y="440" width="160" height="180" rx="8" fill="#EBF2E5" />
+          <Rect x="220" y="420" width="150" height="200" rx="8" fill="#EBF2E5" />
+
+          {/* Roads & Streets */}
+          {/* Main Diagonal Boulevard */}
+          <Line x1="-20" y1="120" x2="420" y2="480" stroke="#FFFFFF" strokeWidth="26" />
+          <Line x1="-20" y1="120" x2="420" y2="480" stroke="#E3DDD1" strokeWidth="1" />
+
+          {/* Secondary Cross Streets */}
+          <Line x1="180" y1="-20" x2="180" y2="800" stroke="#FFFFFF" strokeWidth="20" />
+          <Line x1="70" y1="-20" x2="70" y2="800" stroke="#FFFFFF" strokeWidth="16" />
+          <Line x1="300" y1="-20" x2="300" y2="800" stroke="#FFFFFF" strokeWidth="18" />
+
+          <Line x1="-20" y1="200" x2="420" y2="200" stroke="#FFFFFF" strokeWidth="20" />
+          <Line x1="-20" y1="380" x2="420" y2="380" stroke="#FFFFFF" strokeWidth="22" />
+          <Line x1="-20" y1="560" x2="420" y2="560" stroke="#FFFFFF" strokeWidth="18" />
+
+          {/* Secondary small alleys */}
+          <Line x1="120" y1="100" x2="350" y2="100" stroke="#FFFFFF" strokeWidth="10" />
+          <Line x1="40" y1="300" x2="250" y2="300" stroke="#FFFFFF" strokeWidth="10" />
+          <Line x1="120" y1="480" x2="380" y2="480" stroke="#FFFFFF" strokeWidth="12" />
+        </Svg>
+
+        {/* User Pulsing Location Marker (Center Blue Dot with Halo) */}
+        <View style={styles.userLocationWrap}>
+          <View style={styles.userHaloOuter}>
+            <View style={styles.userHaloInner}>
+              <View style={styles.userCenterDot} />
+            </View>
+          </View>
+        </View>
+
+        {/* Store Pins */}
+        {STORE_MARKERS.map((store) => {
+          const isSelected = selectedStore?.id === store.id;
+          return (
+            <Pressable
+              key={store.id}
+              onPress={() => setSelectedStore(store)}
+              style={[
+                styles.pinWrap,
+                { left: `${store.xPct}%`, top: `${store.yPct}%` },
+              ]}
+              hitSlop={10}
+            >
+              <Svg width={32} height={40} viewBox="0 0 32 40">
+                <Path
+                  d="M 16 0 C 7.2 0 0 7.2 0 16 C 0 26 16 40 16 40 C 16 40 32 26 32 16 C 32 7.2 24.8 0 16 0 Z"
+                  fill={isSelected ? '#374730' : '#55684B'}
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                />
+                <Circle cx="16" cy="15" r="5" fill="#FFFFFF" />
+              </Svg>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Floating Top Controls */}
+      <View style={styles.topOverlay} pointerEvents="box-none">
+        {/* Header Row */}
+        <View style={styles.headerRow}>
           <Pressable
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="ย้อนกลับ"
-            hitSlop={8}
+            hitSlop={12}
+            style={styles.backButton}
           >
-            <Text style={font.title}>‹</Text>
+            <Text style={styles.backArrow}>‹</Text>
+            <Text style={styles.headerTitle}>Map</Text>
           </Pressable>
-          <Text style={font.title}>Map</Text>
         </View>
-        <View style={styles.search}>
-          <Text>🔍</Text>
-          <Text style={font.small}>ค้นหาร้านค้า, เมนู, หรือดีลย่านบรรทัดทอง</Text>
+
+        {/* Search Bar */}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="ค้นหาร้านค้า, ประเภท, หรือแบรนด์"
+            placeholderTextColor="#8A8F85"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
         </View>
+
+        {/* Filter Pills Row */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.pills}
+          contentContainerStyle={styles.filtersRow}
         >
           {FILTERS.map((f) => {
-            const on = f === filter;
+            const active = f === filter;
             return (
               <Pressable
                 key={f}
                 onPress={() => setFilter(f)}
                 accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                style={[styles.pill, on && styles.pillOn]}
+                accessibilityState={{ selected: active }}
+                style={[
+                  styles.filterPill,
+                  active ? styles.filterPillActive : styles.filterPillInactive,
+                ]}
               >
-                <Text style={[font.small, on && styles.pillTextOn]}>{f}</Text>
+                <Text
+                  style={[
+                    styles.filterText,
+                    active ? styles.filterTextActive : styles.filterTextInactive,
+                  ]}
+                >
+                  {f}
+                </Text>
               </Pressable>
             );
           })}
+          {/* Funnel / Filter Settings Button */}
+          <Pressable style={styles.filterIconBtn}>
+            <Text style={styles.filterIconEmoji}>🔽</Text>
+          </Pressable>
         </ScrollView>
       </View>
 
-      <View style={styles.mapContainer}>
-        {!mapError ? (
-          <MapView
-            style={styles.map}
-            mapStyle={MAP_STYLE_URL}
-            logo={false}
-            attribution={false}
-            onDidFailLoadingMap={() => setMapError(true)}
-          >
-            <Camera
-              initialViewState={{
-                center: currentLocation
-                  ? [currentLocation.longitude, currentLocation.latitude]
-                  : BANTADTHONG_COORDS,
-                zoom: 15,
-              }}
-            />
-            {currentLocation && (
-              <UserLocation
-                animated={true}
-                accuracy={true}
-                heading={true}
-              />
-            )}
-            {filteredMerchants.map((m) => (
-              <Marker
-                key={m.merchantId}
-                id={m.merchantId}
-                lngLat={[m.location.longitude, m.location.latitude]}
-                onPress={() => setSelectedId(m.merchantId)}
-              >
-                <View
-                  style={[
-                    styles.pinCircle,
-                    m.merchantId === selectedId && styles.pinCircleActive,
-                  ]}
-                >
-                  <Text style={styles.pinEmoji}>
-                    {m.merchantId === selectedId ? '📍' : '🏪'}
-                  </Text>
-                </View>
-              </Marker>
-            ))}
-          </MapView>
-        ) : (
-          <View style={styles.fallbackMap}>
-            <Text style={styles.fallbackText}>
-              🗺️ แผนที่พร้อมหมุดร้านค้าจริง ({filteredMerchants.length} ร้าน)
-            </Text>
-            {filteredMerchants.map((m) => (
-              <Pressable
-                key={m.merchantId}
-                onPress={() => setSelectedId(m.merchantId)}
-                style={[
-                  styles.fallbackPin,
-                  m.merchantId === selectedId && styles.fallbackPinActive,
-                ]}
-              >
-                <Text style={styles.pinEmoji}>
-                  {m.merchantId === selectedId ? '📍' : '🏪'} {m.merchantName}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </View>
+      {/* Bottom Floating Store Preview Card */}
+      {selectedStore && (
+        <View style={styles.bottomOverlay}>
+          <View style={styles.previewCard}>
+            {/* Top Row: Logo + Info + Coupon Badge + Close */}
+            <View style={styles.previewTopRow}>
+              {/* Store Photo / Logo */}
+              <View style={styles.previewLogoBox}>
+                <Image
+                  source={STORE_AMAZON_IMG}
+                  style={styles.previewLogoImage}
+                  resizeMode="cover"
+                />
+              </View>
 
-      {selected && (
-        <View style={styles.sheet}>
-          <View style={styles.sheetRow}>
-            <View style={styles.thumb}>
-              <Text style={styles.thumbIcon}>🏪</Text>
+              {/* Middle Title & Meta */}
+              <View style={styles.previewInfo}>
+                <Text style={styles.previewTitle}>{selectedStore.name}</Text>
+                <View style={styles.previewMetaRow}>
+                  <Text style={styles.previewDistance}>📍 {selectedStore.distance}</Text>
+                  <Text style={styles.previewRating}>⭐ {selectedStore.rating}</Text>
+                </View>
+              </View>
+
+              {/* Right Side: Badge & Close */}
+              <View style={styles.previewRight}>
+                <Pressable
+                  onPress={() => setSelectedStore(null)}
+                  hitSlop={8}
+                  style={styles.previewCloseBtn}
+                >
+                  <Text style={styles.previewCloseText}>✕</Text>
+                </Pressable>
+                {selectedStore.hasCoupon && (
+                  <View style={styles.couponBadge}>
+                    <Text style={styles.couponBadgeText}>มีคูปอง</Text>
+                  </View>
+                )}
+              </View>
             </View>
-            <View style={styles.flex}>
-              <Text style={font.h2}>{selected.merchantName}</Text>
-              <Text style={font.caption}>
-                📍 {getDistanceKm(selected.location)} km • {selected.category}
-              </Text>
-              <Text style={styles.badge}>{selected.promotion.title}</Text>
-            </View>
+
+            {/* Bottom CTA Button */}
             <Pressable
-              onPress={() => setSelectedId(null)}
-              accessibilityRole="button"
-              accessibilityLabel="ปิดการเลือก"
-              hitSlop={8}
+              onPress={() => onOpenStore(selectedStore.id)}
+              style={({ pressed }) => [
+                styles.detailBtn,
+                pressed && styles.btnPressed,
+              ]}
             >
-              <Text style={font.h2}>✕</Text>
-            </Pressable>
-          </View>
-          <View style={styles.sheetActions}>
-            <Pressable
-              onPress={() => warpToMerchant(selected.merchantId)}
-              accessibilityRole="button"
-              accessibilityLabel="วาร์ปไปหน้าร้านสำหรับเดโม"
-              style={[styles.btn, styles.warpBtn]}
-            >
-              <Text style={styles.warpBtnText}>📍 วาร์ปไปร้าน</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => onOpenStore(selected.merchantId)}
-              accessibilityRole="button"
-              accessibilityLabel="ดูรายละเอียดและรับคูปอง"
-              style={[styles.btn, styles.primaryBtn]}
-            >
-              <Text style={styles.btnText}>ดูร้าน & แลกดีล ›</Text>
+              <Text style={styles.detailBtnText}>ดูรายละเอียด</Text>
             </Pressable>
           </View>
         </View>
@@ -198,124 +279,262 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  top: { padding: space.lg, gap: space.md },
-  header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  search: {
+  root: {
+    flex: 1,
+    backgroundColor: '#FAF7EE',
+  },
+  mapContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  userLocationWrap: {
+    position: 'absolute',
+    left: '48%',
+    top: '42%',
+    marginLeft: -24,
+    marginTop: -24,
+  },
+  userHaloOuter: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59, 130, 246, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userHaloInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(59, 130, 246, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userCenterDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#2563EB',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+  },
+  pinWrap: {
+    position: 'absolute',
+    marginLeft: -16,
+    marginTop: -40,
+    elevation: 6,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 12,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
-  pills: { gap: space.sm },
-  pill: {
-    paddingHorizontal: space.md,
-    paddingVertical: space.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  pillTextOn: { color: colors.onPrimary, fontWeight: '700' },
-  mapContainer: { flex: 1, overflow: 'hidden' },
-  map: { flex: 1 },
-  fallbackMap: {
-    flex: 1,
-    backgroundColor: colors.surfaceMuted,
-    padding: space.lg,
-    gap: space.md,
-    justifyContent: 'center',
-  },
-  fallbackText: { ...font.body, textAlign: 'center', marginBottom: space.sm },
-  fallbackPin: {
-    padding: space.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  fallbackPinActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  pinCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.border,
+  backButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
-  pinCircleActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-    transform: [{ scale: 1.15 }],
+  backArrow: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#262A22',
   },
-  pinEmoji: { fontSize: 20 },
-  sheet: {
-    position: 'absolute',
-    left: space.lg,
-    right: space.lg,
-    bottom: space.lg,
-    padding: space.md,
-    gap: space.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderColor: colors.border,
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#262A22',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderWidth: 1,
+    borderColor: '#EFE9DE',
     elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    gap: 10,
   },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  sheetActions: { flexDirection: 'row', gap: space.sm },
-  thumb: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
+  searchIcon: {
+    fontSize: 16,
   },
-  thumbIcon: { fontSize: 28 },
-  flex: { flex: 1, gap: space.xs },
-  badge: {
-    ...font.small,
-    alignSelf: 'flex-start',
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  btn: {
-    borderRadius: radius.pill,
-    paddingVertical: space.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: space.md,
-  },
-  warpBtn: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1,
+  searchInput: {
     flex: 1,
+    fontSize: 14,
+    color: '#262A22',
+    padding: 0,
   },
-  warpBtnText: {
+  filtersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 6,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    elevation: 2,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  filterPillActive: {
+    backgroundColor: '#55684B',
+  },
+  filterPillInactive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+  },
+  filterText: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
+  },
+  filterTextInactive: {
+    color: '#70756B',
+  },
+  filterIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterIconEmoji: {
+    fontSize: 12,
+  },
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 24,
+    left: 20,
+    right: 20,
+  },
+  previewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#EFE9DE',
+    elevation: 10,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    gap: 14,
+  },
+  previewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewLogoBox: {
+    width: 58,
+    height: 58,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+  },
+  previewLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  previewInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  previewTitle: {
+    fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
+    color: '#262A22',
+    letterSpacing: -0.2,
   },
-  primaryBtn: {
-    backgroundColor: colors.primary,
-    flex: 1.3,
+  previewMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  btnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
+  previewDistance: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#55684B',
+  },
+  previewRating: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#C78923',
+  },
+  previewRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 54,
+  },
+  previewCloseBtn: {
+    padding: 4,
+  },
+  previewCloseText: {
+    fontSize: 14,
+    color: '#A0A59B',
+    fontWeight: '600',
+  },
+  couponBadge: {
+    backgroundColor: '#E04F4F',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  couponBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  detailBtn: {
+    backgroundColor: '#55684B',
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
+  },
+  detailBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
 });

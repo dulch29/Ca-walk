@@ -236,16 +236,42 @@ const StoreRoute = ({ navigation, route }: Props<'Store'>) => (
   />
 );
 const WalletRoute = ({ navigation }: Props<'Wallet'>) => (
-  <DistanceWalletScreen onBack={navigation.goBack} />
+  <DistanceWalletScreen
+    onBack={navigation.goBack}
+    onTabPress={tab => {
+      if (tab === 'Home') {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        navigation.navigate('Main');
+      }
+    }}
+  />
 );
 const MissionsRoute = ({ navigation }: Props<'Missions'>) => (
   <MissionsScreen
     onBack={navigation.goBack}
     onGo={() => navigation.navigate('Map')}
+    onTabPress={tab => {
+      if (tab === 'Home') {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        navigation.navigate('Main');
+      }
+    }}
   />
 );
 const CouponsRoute = ({ navigation }: Props<'Coupons'>) => (
-  <MyCouponsScreen onBack={navigation.goBack} />
+  <MyCouponsScreen
+    onBack={navigation.goBack}
+    onTabPress={tab => {
+      if (tab === 'Home') {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        navigation.navigate('Main');
+      }
+    }}
+    onStorePress={storeId => navigation.navigate('Store', { storeId })}
+  />
 );
 const RecordSummaryRoute = ({ navigation, route }: Props<'RecordSummary'>) => (
   <RecordSummaryScreen
