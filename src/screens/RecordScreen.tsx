@@ -292,18 +292,22 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
         )}
       </View>
 
-      {/* Top Header Bar */}
+      {/* Top Header Floating Pill */}
       <View style={styles.header}>
         <Pressable
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="ย้อนกลับไปหน้าแรก"
-          style={styles.backBtn}
-          hitSlop={12}
+          style={[styles.headerPill, active && styles.headerPillCompact]}
+          hitSlop={10}
         >
-          <Text style={styles.backArrow}>‹</Text>
+          <View style={styles.backBtnCircle}>
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.8}>
+              <Path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </View>
+          {!active && <Text style={styles.headerTitle}>ออกเดินทาง</Text>}
         </Pressable>
-        <Text style={styles.headerTitle}>ออกเดินทาง</Text>
       </View>
 
       {/* Top Floating Timer Pill (Screens 4 & 5) */}
