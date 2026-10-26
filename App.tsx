@@ -304,7 +304,10 @@ export default function App() {
         <StatusBar barStyle="dark-content" />
         <SafeAreaView style={styles.root}>
           <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Navigator
+              initialRouteName="Main"
+              screenOptions={{ headerShown: false }}
+            >
               <Stack.Screen name="GetStarted" component={GetStarted} />
               <Stack.Screen name="Login" component={Login} />
               <Stack.Screen name="Main" component={MainTabs} />
@@ -342,17 +345,17 @@ const tabStyles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 68,
-    backgroundColor: '#FAF6ED',
-    borderTopWidth: 1.5,
-    borderTopColor: '#ECE4D6',
+    height: 72,
+    backgroundColor: '#FAF7EE',
+    borderTopWidth: 1.2,
+    borderTopColor: '#ECE4D8',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingBottom: 6,
+    paddingHorizontal: 24,
+    paddingBottom: 10,
     elevation: 10,
     shadowColor: '#262A22',
     shadowOffset: { width: 0, height: -3 },
