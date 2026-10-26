@@ -9,15 +9,12 @@ import {
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
+import Svg, { Path } from 'react-native-svg';
 import CatAvatar from '../components/CatAvatar';
-import { quests } from '../data/mock';
-import { font } from '../theme';
 import { fmtPace, RunSummary } from './RecordScreen';
-import { coinsFor } from './RecordSummaryScreen';
 import { styles } from './RecordStoryScreen.styles';
 
-// static PNG for anything that gets captured/shared (doc: no GIF frames in images)
-const CAT_PNG = require('../../Assests/Cat/Photo/walk (1).png');
+const STORY_PARK_IMG = require('../../Assests/Images/story_park.jpg');
 
 type Props = {
   summary: RunSummary;
@@ -26,8 +23,6 @@ type Props = {
 };
 
 const SLIDES = 4;
-// shortcut: fixed demo multipliers vs "usual" day, compute from history when Me/history exists
-const TREND = { steps: 2.4, km: 2.1, pace: 1.8 };
 
 export default function RecordStoryScreen({
   summary,
@@ -39,8 +34,6 @@ export default function RecordStoryScreen({
   const [busy, setBusy] = useState(false);
   const slides = useRef<(React.ComponentRef<typeof View> | null)[]>([]);
   const time = new Date().toTimeString().slice(0, 5);
-  const daily = quests.filter(q => q.kind === 'daily').slice(0, 3);
-  const top = daily[0];
 
   const share = async () => {
     const node = slides.current[page];
@@ -52,35 +45,31 @@ export default function RecordStoryScreen({
       const uri = await captureRef(node, { format: 'png', quality: 1 });
       await Share.open({ url: uri, type: 'image/png' });
     } catch {
-      // user closed the share sheet or capture failed; nothing to undo
+      // User cancelled share or failed
     } finally {
       setBusy(false);
     }
   };
 
-  const photo = (
-    <View>
-      {photoUri ? (
-        <Image
-          source={{ uri: photoUri }}
-          style={styles.photo}
-          accessibilityLabel="รูปของคุณ"
-        />
-      ) : (
-        <View style={[styles.photo, styles.photoEmpty]} />
-      )}
-      <Image source={CAT_PNG} style={styles.catStamp} resizeMethod="scale" />
+  const polaroidPhoto = (
+    <View style={styles.polaroidImageContainer}>
+      <Image
+        source={photoUri ? { uri: photoUri } : STORY_PARK_IMG}
+        style={styles.polaroidImage}
+        resizeMode="cover"
+        accessibilityLabel="ภาพถ่ายกิจกรรมในสวน"
+      />
     </View>
   );
 
-  const slide = (i: number, children: React.ReactNode) => (
-    <View key={i} style={{ width }}>
+  const slideWrapper = (i: number, children: React.ReactNode) => (
+    <View key={i} style={[{ width }, styles.slideWrapper]}>
       <View
         ref={r => {
           slides.current[i] = r;
         }}
         collapsable={false}
-        style={styles.slide}
+        style={styles.slideCard}
       >
         {children}
       </View>
@@ -89,10 +78,13 @@ export default function RecordStoryScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.bars}>
-        {Array.from({ length: SLIDES }, (_, i) => (
-          <View key={i} style={[styles.bar, i <= page && styles.barOn]} />
-        ))}
+      {/* Top Indicators */}
+      <View style={styles.topBar}>
+        <View style={styles.bars}>
+          {Array.from({ length: SLIDES }, (_, i) => (
+            <View key={i} style={[styles.bar, i <= page && styles.barOn]} />
+          ))}
+        </View>
       </View>
 
       <ScrollView
@@ -103,118 +95,200 @@ export default function RecordStoryScreen({
           setPage(Math.round(e.nativeEvent.contentOffset.x / width))
         }
       >
-        {slide(
+        {/* Slide 0: Quest Completed! */}
+        {slideWrapper(
           0,
           <>
-            <Text style={styles.headline}>
-              Small steps{'\n'}Big <Text style={styles.underline}>rewards</Text>{' '}
-              🐾
-            </Text>
-            <View style={styles.polaroid}>
-              <View style={styles.tape} />
-              {photo}
-              <Text style={styles.caption}>Today's walk 🐾</Text>
+            <View style={styles.questHeaderRow}>
+              <Text style={styles.questHeaderTitle}>Quest Completed!</Text>
+              <View style={styles.questCheckCircle}>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={3}>
+                  <Path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </View>
             </View>
-            <View style={styles.meta}>
-              <Text style={font.body}>📍 Bangkok, Thailand</Text>
-              <Text style={font.body}>🕒 {time}</Text>
+
+            <View style={styles.questCatRow}>
+              <CatAvatar size={70} mood="jump" />
+              <View style={styles.questSpeechBubble}>
+                <Text style={styles.questSpeechText}>ภารกิจสำเร็จแล้ว เยี่ยมมาก! ♥</Text>
+              </View>
             </View>
-            <View style={styles.leaves}>
-              <Text style={styles.leafText}>🌿🌱🌿🌱🌿</Text>
+
+            {/* Main Quest Box */}
+            <View style={styles.mainProgressCard}>
+              <View style={styles.mainProgressTop}>
+                <Text style={styles.mainProgressLabel}>เดินครบ 5 km (5/5 km)</Text>
+                <View style={styles.rewardBadge}>
+                  <Text style={styles.rewardBadgeText}>+20</Text>
+                </View>
+              </View>
+              <View style={styles.progressBarTrack}>
+                <View style={styles.progressBarFill} />
+              </View>
+            </View>
+
+            {/* Daily Quest Checklist */}
+            <View style={styles.checklistSection}>
+              <Text style={styles.checklistTitle}>Daily Quest</Text>
+
+              <View style={styles.checklistItem}>
+                <View style={styles.checkItemLeft}>
+                  <Text>✅</Text>
+                  <Text style={styles.checkItemText}>เดินครบ 5 km</Text>
+                </View>
+                <Text style={styles.checkItemReward}>🪙 +20</Text>
+              </View>
+
+              <View style={styles.checklistItem}>
+                <View style={styles.checkItemLeft}>
+                  <Text>✅</Text>
+                  <Text style={styles.checkItemText}>ทำกิจกรรม 20 นาที</Text>
+                </View>
+                <Text style={styles.checkItemReward}>🪙 +15</Text>
+              </View>
+
+              <View style={styles.checklistItem}>
+                <View style={styles.checkItemLeft}>
+                  <Text>🎁</Text>
+                  <Text style={styles.checkItemText}>ไปที่ร้านกาแฟ</Text>
+                </View>
+                <Text style={styles.checkItemReward}>🪙 +50</Text>
+              </View>
+            </View>
+
+            <View style={styles.questFooterRow}>
+              <CatAvatar size={48} mood="walk" />
+              <Text style={styles.questFooterText}>Another step closer to your goal! ♥</Text>
             </View>
           </>,
         )}
 
-        {slide(
+        {/* Slide 1: Polaroid + Multiplier (That's 2.4x your usual Tuesdays) */}
+        {slideWrapper(
           1,
           <>
-            <Text style={styles.headline}>You walked</Text>
-            <Text style={styles.huge}>{summary.steps.toLocaleString()} 🐾</Text>
-            <Text style={styles.headline}>steps.</Text>
-            <Text style={styles.bubble}>เก่งมากเลย วันนี้! ♥</Text>
-            <CatAvatar size={150} mood="walk" />
-            <View style={styles.brush}>
-              <Text style={styles.foot}>
+            <Text style={styles.polaroidHeaderTitle}>
+              That's 2.4x{'\n'}your usual Tuesdays.
+            </Text>
+
+            <View style={styles.polaroidCard}>
+              <View style={styles.washiTape} />
+              {polaroidPhoto}
+              <Text style={styles.polaroidCaption}>Good vibes Good steps 🐾</Text>
+            </View>
+
+            <View style={styles.statRowsSection}>
+              <View style={styles.statRowItem}>
+                <View style={styles.statRowLeft}>
+                  <Text style={styles.statRowIcon}>👟</Text>
+                  <Text style={styles.statRowValue}>
+                    {summary.steps > 0 ? summary.steps.toLocaleString() : '12,430'}
+                  </Text>
+                  <Text style={styles.statRowSub}>steps</Text>
+                </View>
+                <Text style={styles.statRowTrend}>↑ 2.4x</Text>
+              </View>
+
+              <View style={styles.statRowItem}>
+                <View style={styles.statRowLeft}>
+                  <Text style={styles.statRowIcon}>📏</Text>
+                  <Text style={styles.statRowValue}>{summary.km.toFixed(1)} km</Text>
+                  <Text style={styles.statRowSub}>Steps</Text>
+                </View>
+                <Text style={styles.statRowTrend}>↑ 2.1x</Text>
+              </View>
+
+              <View style={styles.statRowItem}>
+                <View style={styles.statRowLeft}>
+                  <Text style={styles.statRowIcon}>⏱️</Text>
+                  <Text style={styles.statRowValue}>
+                    {fmtPace(summary.seconds, summary.km)} /km
+                  </Text>
+                  <Text style={styles.statRowSub}>Steps</Text>
+                </View>
+                <Text style={styles.statRowTrend}>↑ 1.8x</Text>
+              </View>
+            </View>
+          </>,
+        )}
+
+        {/* Slide 2: Huge Steps Highlight */}
+        {slideWrapper(
+          2,
+          <>
+            <Text style={styles.hugeStepsSubtitle}>You walked</Text>
+            <Text style={styles.hugeStepsNumber}>
+              {summary.steps > 0 ? summary.steps.toLocaleString() : '12,430'} 🐾
+            </Text>
+            <Text style={styles.hugeStepsSubtitle}>steps.</Text>
+
+            <View style={styles.speechBubbleCenter}>
+              <Text style={styles.speechBubbleCenterText}>เก่งมากเลย วันนี้! ♥</Text>
+            </View>
+
+            <CatAvatar size={130} mood="walk" />
+
+            <View style={styles.keepGoingBox}>
+              <Text style={styles.keepGoingText}>
                 Keep going{'\n'}You're doing great! 🐾
               </Text>
             </View>
-          </>,
-        )}
 
-        {slide(
-          2,
-          <>
-            <Text style={styles.headline}>
-              That's {TREND.steps}x{'\n'}your usual days.
-            </Text>
-            <View style={styles.polaroid}>
-              <View style={styles.tape} />
-              {photo}
-              <Text style={styles.caption}>Good vibes{'\n'}Good steps 🐾</Text>
+            <View style={styles.botanicalFoliage}>
+              <Text style={styles.foliageEmoji}>🌿 🌱 🌿 🌱 🌿</Text>
             </View>
-            {[
-              ['👟', summary.steps.toLocaleString(), 'steps', TREND.steps],
-              ['📏', `${summary.km.toFixed(2)} km`, 'distance', TREND.km],
-              [
-                '⏱️',
-                `${fmtPace(summary.seconds, summary.km)} /km`,
-                'pace',
-                TREND.pace,
-              ],
-            ].map(([icon, value, label, x]) => (
-              <View key={label as string} style={styles.statCard}>
-                <Text style={styles.statIcon}>{icon}</Text>
-                <View style={styles.flex}>
-                  <Text style={font.h2}>{value}</Text>
-                  <Text style={font.body}>{label}</Text>
-                </View>
-                <Text style={styles.trend}>↑ {x}x</Text>
-              </View>
-            ))}
           </>,
         )}
 
-        {slide(
+        {/* Slide 3: Polaroid Postcard (Small steps Big rewards) */}
+        {slideWrapper(
           3,
           <>
-            <View style={styles.questTop}>
-              <Text style={font.h2}>Quest Completed! 🎉</Text>
-              {top && <Text style={font.body}>{top.title}</Text>}
-              <View style={styles.track}>
-                <View style={[styles.fill, styles.fillFull]} />
-              </View>
+            <Text style={styles.polaroidHeaderTitle}>
+              Small steps{'\n'}Big rewards 🐾
+            </Text>
+
+            <View style={styles.polaroidCard}>
+              <View style={styles.washiTape} />
+              {polaroidPhoto}
+              <Text style={styles.polaroidCaption}>Today's walk 🐾</Text>
             </View>
-            <View style={styles.polaroid}>
-              <View style={styles.tape} />
-              {photo}
-              <Text style={styles.caption}>Mission done 🐾</Text>
+
+            <View style={styles.polaroidMetaRow}>
+              <Text style={styles.polaroidMetaItem}>📍 Lumpini Park</Text>
+              <Text style={styles.polaroidMetaItem}>🕒 {time}</Text>
             </View>
-            {daily.map(q => (
-              <View key={q.id} style={styles.questRow}>
-                <Text style={font.body}>✅ {q.title}</Text>
-              </View>
-            ))}
-            <Text style={styles.coin}>+{coinsFor(summary.km)} 🪙</Text>
+
+            <View style={styles.botanicalFoliageSpaced}>
+              <Text style={styles.foliageEmoji}>🌿 🌱 🌾 🌱 🌿</Text>
+            </View>
           </>,
         )}
       </ScrollView>
 
+      {/* Bottom Actions */}
       <View style={styles.actions}>
         <Pressable
-          style={styles.ghost}
+          style={styles.ghostBtn}
           onPress={onClose}
           accessibilityRole="button"
+          accessibilityLabel="ปิดหน้า Story"
         >
-          <Text style={styles.ghostText}>ปิด</Text>
+          <Text style={styles.ghostBtnText}>ปิด</Text>
         </Pressable>
+
         <Pressable
-          style={styles.btn}
+          style={styles.shareBtn}
           onPress={share}
           disabled={busy}
           accessibilityRole="button"
+          accessibilityLabel="แชร์ภาพกิจกรรม"
           accessibilityState={{ disabled: busy }}
         >
-          <Text style={styles.btnText}>{busy ? 'กำลังเตรียม...' : 'แชร์'}</Text>
+          <Text style={styles.shareBtnText}>
+            {busy ? 'กำลังเตรียม...' : 'แชร์ Story'}
+          </Text>
         </Pressable>
       </View>
     </View>

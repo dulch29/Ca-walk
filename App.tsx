@@ -85,6 +85,7 @@ function RecordTab() {
   const nav = useNavigation<Nav>();
   return (
     <RecordScreen
+      onBack={() => nav.navigate('Home' as any)}
       onFinish={summary => nav.navigate('RecordSummary', { summary })}
       onCamera={() => nav.navigate('RecordCamera')}
     />
@@ -136,6 +137,10 @@ function renderTabIcon(name: string, isFocused: boolean) {
 }
 
 function FloatingPillTabBar({ state, navigation }: BottomTabBarProps) {
+  if (state.routes[state.index]?.name === 'Record') {
+    return null;
+  }
+
   const tabs = [
     { name: 'Home', label: 'Home' },
     { name: 'Record', label: 'Record' },
