@@ -58,6 +58,20 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
   },
+  fraudCard: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+  },
+  fraudText: {
+    color: '#B91C1C',
+  },
+  warningCard: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FCD34D',
+  },
+  warningText: {
+    color: '#B45309',
+  },
   timer: {
     fontSize: 40,
     fontWeight: '800',

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { storeCoupons, stores } from '../data/mock';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useAppContext } from '../context/AppContext';
+import { stores } from '../data/mock';
 import { colors, font, radius, space } from '../theme';
 
 type Props = {
@@ -12,9 +13,37 @@ type Props = {
 const TABS = ['คูปอง', 'รีวิว', 'ข้อมูลร้าน'];
 
 export default function StoreDetailScreen({ storeId, onBack, onGo }: Props) {
+  const { merchants, coupons, user, exchangeDistanceForCoupon } = useAppContext();
   const [tab, setTab] = useState(TABS[0]);
-  const [claimed, setClaimed] = useState<string[]>([]);
-  const store = stores.find(s => s.id === storeId) ?? stores[0];
+  const [claimMsg, setClaimMsg] = useState<string | null>(null);
+
+  const merchant = merchants.find((m) => m.merchantId === storeId);
+  const fallbackStore = stores.find((s) => s.id === storeId) ?? stores[0];
+
+  const storeName = merchant?.merchantName ?? fallbackStore.name;
+  const storeCategory = merchant?.category ?? fallbackStore.tags;
+  const promo = merchant?.promotion ?? {
+    title: 'ส่วนลดพิเศษ 20 บาท',
+    description: 'เดินสะสมระยะทางครบ 2.0 km เพื่อแลกรับสิทธิ์',
+    requiredDistanceKm: 2.0,
+  };
+
+  const hasUnlockedCoupon = coupons.some(
+    (c) => c.merchantId === (merchant?.merchantId ?? storeId) && c.status === 'unlocked',
+  );
+
+  const handleExchange = () => {
+    if (!merchant) {
+      Alert.alert('แจ้งเตือน', 'ไม่พบข้อมูลร้านค้านี้ในระบบ');
+      return;
+    }
+    const result = exchangeDistanceForCoupon(merchant.merchantId);
+    if (result.ok) {
+      setClaimMsg('🎉 แลกคูปองสำเร็จ! คูปองอยู่ในกระเป๋า My Coupons แล้ว');
+    } else {
+      setClaimMsg(`⚠️ ${result.reason}`);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -33,17 +62,21 @@ export default function StoreDetailScreen({ storeId, onBack, onGo }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={font.title}>{store.name}</Text>
+          <Text style={font.title}>{storeName}</Text>
           <Text style={font.small}>
-            ⭐ {store.rating} ({store.reviews} รีวิว) 📍 {store.km} km
+            ⭐ 4.8 (120 รีวิว) 📍 0.8 km • {storeCategory}
           </Text>
-          <Text style={font.small}>{store.tags}</Text>
-          <Text style={font.body}>🕒 {store.hours}</Text>
-          <Text style={font.body}>📍 {store.address}</Text>
+          <Text style={font.body}>🕒 เปิดบริการ 10:00 - 21:00</Text>
+          <Text style={font.body}>📍 ย่านบรรทัดทอง - สามย่าน กรุงเทพฯ</Text>
+          <View style={styles.balanceBadge}>
+            <Text style={styles.balanceText}>
+              👛 ระยะสะสมสำหรับแลก: {user.redeemableDistanceKm.toFixed(1)} km
+            </Text>
+          </View>
         </View>
 
         <View style={styles.tabs}>
-          {TABS.map(t => {
+          {TABS.map((t) => {
             const on = t === tab;
             return (
               <Pressable
@@ -60,39 +93,58 @@ export default function StoreDetailScreen({ storeId, onBack, onGo }: Props) {
         </View>
 
         {tab === 'คูปอง' ? (
-          storeCoupons.map(c => {
-            const got = claimed.includes(c.id);
-            return (
-              <View key={c.id} style={styles.coupon}>
-                <View style={styles.thumb}>
-                  <Text style={styles.thumbIcon}>🎟️</Text>
-                </View>
-                <View style={styles.flex}>
-                  <Text style={font.h2}>{c.title}</Text>
-                  <Text style={font.small}>{c.cond}</Text>
-                  <Text style={font.small}>{c.expires}</Text>
-                </View>
-                <Pressable
-                  onPress={() => setClaimed(prev => [...prev, c.id])}
-                  disabled={got}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: got }}
-                  style={[styles.claim, got && styles.claimDone]}
-                >
-                  <Text style={styles.claimText}>
-                    {got ? 'รับแล้ว' : 'รับคูปอง'}
-                  </Text>
-                </Pressable>
+          <View style={styles.dealContainer}>
+            {claimMsg && (
+              <View style={styles.msgBanner}>
+                <Text style={styles.msgText}>{claimMsg}</Text>
               </View>
-            );
-          })
+            )}
+
+            <View style={styles.coupon}>
+              <View style={styles.thumb}>
+                <Text style={styles.thumbIcon}>🎟️</Text>
+              </View>
+              <View style={styles.flex}>
+                <Text style={font.h2}>{promo.title}</Text>
+                <Text style={font.small}>{promo.description}</Text>
+                <Text style={styles.reqDist}>
+                  🏃 ต้องใช้ระยะทาง: {promo.requiredDistanceKm.toFixed(1)} km
+                </Text>
+              </View>
+              <Pressable
+                onPress={handleExchange}
+                disabled={hasUnlockedCoupon}
+                accessibilityRole="button"
+                style={[styles.claim, hasUnlockedCoupon && styles.claimDone]}
+              >
+                <Text style={styles.claimText}>
+                  {hasUnlockedCoupon ? 'มีในกระเป๋าแล้ว' : 'แลกสิทธิ์'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : tab === 'ข้อมูลร้าน' ? (
+          <View style={styles.infoCard}>
+            <Text style={font.h2}>สถิติร้านค้า (Merchant Metrics)</Text>
+            <Text style={font.body}>
+              🚶 จำนวนคนเดินมาเยือน: {merchant?.metrics.walkIns ?? 12} ครั้ง
+            </Text>
+            <Text style={font.body}>
+              🎟️ จำนวนการแลกใช้คูปอง: {merchant?.metrics.redeemed ?? 8} ใบ
+            </Text>
+            <Text style={font.small}>
+              *ข้อมูลจำลองแบบ Client-Side สำหรับ Hackathon Demo
+            </Text>
+          </View>
         ) : (
-          <Text style={[font.small, styles.empty]}>ยังไม่มีข้อมูล</Text>
+          <Text style={[font.small, styles.empty]}>
+            ยังไม่มีรีวิวสำหรับร้านนี้ เป็นคนแรกที่รีวิวเลย!
+          </Text>
         )}
       </ScrollView>
 
       <Pressable onPress={onGo} accessibilityRole="button" style={styles.go}>
-        <Text style={styles.goText}>ไปเลย</Text>
+        <Text style={styles.goText}>ไปที่แผนที่</Text>
       </Pressable>
     </View>
   );
@@ -129,53 +181,84 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
   },
+  balanceBadge: {
+    marginTop: space.sm,
+    padding: space.xs,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.sm,
+  },
+  balanceText: { ...font.small, color: colors.primaryDark, fontWeight: '700' },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: space.lg,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.pill,
+    padding: space.xs,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: space.sm },
-  tabOn: { borderBottomWidth: 3, borderColor: colors.primary },
-  tabTextOn: { color: colors.primary, fontWeight: '700' },
+  tab: {
+    flex: 1,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+  },
+  tabOn: { backgroundColor: colors.surface },
+  tabTextOn: { fontWeight: '700', color: colors.text },
+  dealContainer: { gap: space.md, paddingHorizontal: space.lg },
+  msgBanner: {
+    padding: space.sm,
+    backgroundColor: colors.surface,
+    borderColor: colors.primary,
+    borderWidth: 1,
+    borderRadius: radius.md,
+  },
+  msgText: { ...font.small, color: colors.text },
   coupon: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    marginHorizontal: space.lg,
-    padding: space.md,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    padding: space.md,
   },
   thumb: {
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   thumbIcon: { fontSize: 24 },
-  flex: { flex: 1, gap: 2 },
+  flex: { flex: 1, gap: space.xs },
+  reqDist: { ...font.small, color: colors.primary, fontWeight: '700' },
   claim: {
     backgroundColor: colors.primary,
     borderRadius: radius.pill,
+    paddingVertical: space.xs,
     paddingHorizontal: space.md,
-    paddingVertical: space.sm,
   },
   claimDone: { backgroundColor: colors.locked },
-  claimText: { fontSize: 13, fontWeight: '700', color: colors.onPrimary },
-  empty: { textAlign: 'center', marginTop: space.lg },
+  claimText: { ...font.small, color: colors.onPrimary, fontWeight: '700' },
+  infoCard: {
+    marginHorizontal: space.lg,
+    padding: space.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderColor: colors.border,
+    borderWidth: 1,
+    gap: space.sm,
+  },
+  empty: { textAlign: 'center', marginTop: space.xl },
   go: {
     position: 'absolute',
+    bottom: space.lg,
     left: space.lg,
     right: space.lg,
-    bottom: space.lg,
     backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    paddingVertical: space.lg,
+    paddingVertical: space.md,
     alignItems: 'center',
   },
   goText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },

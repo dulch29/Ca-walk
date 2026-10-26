@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Coupon, coupons, wallet } from '../data/mock';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useAppContext } from '../context/AppContext';
+import type { Coupon } from '../services/mockData';
 import { colors, font, radius, space } from '../theme';
 
 type Props = {
@@ -16,13 +17,56 @@ const FILTERS: { label: string; key: Filter }[] = [
 ];
 
 export default function MyCouponsScreen({ onBack }: Props) {
+  const { coupons, user, merchants, redeemMockCoupon, warpToMerchant } =
+    useAppContext();
   const [filter, setFilter] = useState<Filter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
-  const list = coupons.filter(
-    c => c.status !== 'locked' && (filter === 'all' || c.status === filter),
-  );
-  const locked =
-    filter === 'all' ? coupons.filter(c => c.status === 'locked') : [];
+  const [redeemError, setRedeemError] = useState<string | null>(null);
+
+  const list = coupons.filter((c) => {
+    if (filter === 'all') {
+      return true;
+    }
+    if (filter === 'usable') {
+      return c.status === 'unlocked';
+    }
+    if (filter === 'used') {
+      return c.status === 'redeemed';
+    }
+    return true;
+  });
+
+  const lockedMerchants =
+    filter === 'all'
+      ? merchants.filter(
+          (m) =>
+            m.promotion.requiredDistanceKm > user.redeemableDistanceKm &&
+            !coupons.some(
+              (c) => c.merchantId === m.merchantId && c.status === 'unlocked',
+            ),
+        )
+      : [];
+
+  const handleRedeem = (coupon: Coupon) => {
+    setRedeemError(null);
+    const result = redeemMockCoupon(coupon.couponId);
+    if (!result.ok) {
+      setRedeemError(result.reason);
+      Alert.alert('ใช้คูปองไม่สำเร็จ', result.reason, [
+        {
+          text: 'จำลองเดินเข้าใกล้ร้าน (Demo)',
+          onPress: () => {
+            warpToMerchant(coupon.merchantId);
+            Alert.alert(
+              'จำลองตำแหน่งสำเร็จ',
+              'จำลองพิกัดเข้าใกล้ร้านค้าเรียบร้อยแล้ว กด "ใช้คูปองนี้" อีกครั้งได้เลย',
+            );
+          },
+        },
+        { text: 'ตกลง' },
+      ]);
+    }
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -38,8 +82,14 @@ export default function MyCouponsScreen({ onBack }: Props) {
         <Text style={font.title}>คูปองของฉัน</Text>
       </View>
 
+      <View style={styles.balanceInfo}>
+        <Text style={font.small}>
+          👛 ระยะสะสมสำหรับแลก: {user.redeemableDistanceKm.toFixed(1)} km
+        </Text>
+      </View>
+
       <View style={styles.pills}>
-        {FILTERS.map(f => {
+        {FILTERS.map((f) => {
           const on = f.key === filter;
           return (
             <Pressable
@@ -57,33 +107,40 @@ export default function MyCouponsScreen({ onBack }: Props) {
         })}
       </View>
 
-      {list.length === 0 && locked.length === 0 && (
+      {redeemError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {redeemError}</Text>
+        </View>
+      )}
+
+      {list.length === 0 && lockedMerchants.length === 0 && (
         <Text style={[font.small, styles.empty]}>ยังไม่มีคูปองในหมวดนี้</Text>
       )}
 
-      {list.map(c => (
+      {list.map((c) => (
         <CouponCard
-          key={c.id}
+          key={c.couponId}
           coupon={c}
-          open={openId === c.id}
-          onToggle={() => setOpenId(openId === c.id ? null : c.id)}
+          open={openId === c.couponId}
+          onToggle={() => setOpenId(openId === c.couponId ? null : c.couponId)}
+          onRedeem={() => handleRedeem(c)}
         />
       ))}
 
-      {locked.map(c => {
-        const goal = c.unlockKm ?? 1;
-        const pct = Math.min(1, wallet.km / goal);
+      {lockedMerchants.map((m) => {
+        const goal = m.promotion.requiredDistanceKm;
+        const pct = Math.min(1, user.redeemableDistanceKm / goal);
         return (
-          <View key={c.id} style={[styles.card, styles.lockedCard]}>
+          <View key={m.merchantId} style={[styles.card, styles.lockedCard]}>
             <View style={styles.row}>
               <View style={styles.thumb}>
                 <Text style={styles.thumbIcon}>🔒</Text>
               </View>
               <View style={styles.flex}>
-                <Text style={font.h2}>{c.title}</Text>
-                <Text style={font.small}>เมื่อเดินครบ {goal} km</Text>
+                <Text style={font.h2}>{m.promotion.title}</Text>
+                <Text style={font.small}>📍 {m.merchantName}</Text>
                 <Text style={font.small}>
-                  {Math.floor(wallet.km)} / {goal} km
+                  สะสม {user.redeemableDistanceKm.toFixed(1)} / {goal.toFixed(1)} km
                 </Text>
               </View>
             </View>
@@ -102,12 +159,16 @@ function CouponCard({
   coupon,
   open,
   onToggle,
+  onRedeem,
 }: {
   coupon: Coupon;
   open: boolean;
   onToggle: () => void;
+  onRedeem: () => void;
 }) {
-  const usable = coupon.status === 'usable';
+  const usable = coupon.status === 'unlocked';
+  const expiresDate = new Date(coupon.expiresAt).toLocaleDateString('th-TH');
+
   return (
     <View style={styles.card}>
       <View style={styles.row}>
@@ -115,14 +176,15 @@ function CouponCard({
           <Text style={styles.thumbIcon}>🎟️</Text>
         </View>
         <View style={styles.flex}>
-          <Text style={font.h2}>{coupon.title}</Text>
-          <Text style={font.body}>📍 {coupon.store}</Text>
-          <Text style={font.small}>ใช้ได้ถึง {coupon.expires}</Text>
+          <Text style={font.h2}>{coupon.dealTitle}</Text>
+          <Text style={font.body}>📍 {coupon.merchantName}</Text>
+          <Text style={font.small}>ใช้ได้ถึง {expiresDate}</Text>
         </View>
         <Text style={[styles.tag, !usable && styles.tagOff]}>
-          {usable ? 'ใช้ได้' : 'ใช้แล้ว'}
+          {usable ? 'พร้อมใช้' : 'ใช้แล้ว'}
         </Text>
       </View>
+
       <Pressable
         onPress={onToggle}
         accessibilityRole="button"
@@ -130,13 +192,33 @@ function CouponCard({
         style={styles.more}
       >
         <Text style={styles.moreText}>
-          {open ? 'ซ่อนรายละเอียด ˄' : 'ดูรายละเอียด ›'}
+          {open ? 'ซ่อนรายละเอียด ˄' : 'ดูรหัสคูปอง ›'}
         </Text>
       </Pressable>
+
       {open && (
-        <Text style={font.small}>
-          แสดงคูปองนี้ที่หน้าร้าน {coupon.store} ใช้ได้ 1 ครั้งต่อบัญชี
-        </Text>
+        <View style={styles.details}>
+          <Text style={font.small}>
+            แสดงรหัสนี้แก่พนักงานหน้าร้าน {coupon.merchantName} (ใช้ได้ 1 ครั้ง)
+          </Text>
+          <View style={styles.tokenBox}>
+            <Text style={styles.tokenText}>{coupon.oneTimeToken}</Text>
+          </View>
+          {usable && (
+            <Pressable
+              onPress={onRedeem}
+              accessibilityRole="button"
+              style={styles.redeemBtn}
+            >
+              <Text style={styles.redeemBtnText}>กดใช้คูปองนี้ (หน้าร้าน)</Text>
+            </Pressable>
+          )}
+          {coupon.status === 'redeemed' && coupon.redeemedAt && (
+            <Text style={[font.small, styles.redeemedAt]}>
+              ✅ ใช้เมื่อ {new Date(coupon.redeemedAt).toLocaleString('th-TH')}
+            </Text>
+          )}
+        </View>
       )}
     </View>
   );
@@ -146,6 +228,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  balanceInfo: {
+    backgroundColor: colors.surface,
+    padding: space.sm,
+    borderRadius: radius.md,
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
   pills: { flexDirection: 'row', gap: space.sm },
   pill: {
     paddingHorizontal: space.md,
@@ -157,47 +246,83 @@ const styles = StyleSheet.create({
   },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillTextOn: { color: colors.onPrimary, fontWeight: '700' },
+  errorBanner: {
+    padding: space.sm,
+    backgroundColor: '#FEE2E2',
+    borderColor: colors.danger,
+    borderWidth: 1,
+    borderRadius: radius.md,
+  },
+  errorText: { ...font.small, color: colors.danger },
   empty: { textAlign: 'center', marginTop: space.xl },
   card: {
+    padding: space.md,
+    gap: space.sm,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: radius.md,
-    padding: space.md,
-    gap: space.sm,
+    borderRadius: radius.lg,
   },
-  lockedCard: { backgroundColor: colors.surfaceMuted },
+  lockedCard: { backgroundColor: colors.surfaceMuted, opacity: 0.9 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   thumb: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     borderRadius: radius.sm,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   thumbIcon: { fontSize: 24 },
   flex: { flex: 1, gap: 2 },
   tag: {
-    alignSelf: 'flex-start',
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.onPrimary,
-    backgroundColor: colors.primary,
     paddingHorizontal: space.sm,
     paddingVertical: 2,
     borderRadius: radius.pill,
-    overflow: 'hidden',
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryDark,
+    fontWeight: '700',
+    fontSize: 12,
   },
-  tagOff: { color: colors.text, backgroundColor: colors.surfaceMuted },
-  more: { alignSelf: 'flex-start' },
-  moreText: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  track: {
-    height: 8,
+  tagOff: { backgroundColor: colors.surfaceMuted, color: colors.textMuted },
+  more: { paddingTop: space.xs },
+  moreText: { ...font.small, color: colors.primary, fontWeight: '700' },
+  details: {
+    paddingTop: space.sm,
+    gap: space.sm,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+  },
+  tokenBox: {
+    alignSelf: 'center',
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.sm,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  tokenText: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: colors.text,
+  },
+  redeemBtn: {
+    backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    paddingVertical: space.sm,
+    alignItems: 'center',
+  },
+  redeemBtnText: { color: colors.onPrimary, fontWeight: '700' },
+  redeemedAt: { textAlign: 'center', color: colors.primaryDark },
+  track: {
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
     overflow: 'hidden',
   },
   fill: { height: '100%', backgroundColor: colors.primary },
-  cheer: { fontSize: 12, color: colors.primaryDark },
+  cheer: { ...font.small, color: colors.primaryDark, fontStyle: 'italic' },
 });

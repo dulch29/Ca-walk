@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { stores } from '../data/mock';
+import {
+  Map as MapView,
+  Camera,
+  Marker,
+  UserLocation,
+} from '@maplibre/maplibre-react-native';
+import { useAppContext } from '../context/AppContext';
+import { haversineDistanceMeters } from '../services/locationUtils';
 import { colors, font, radius, space } from '../theme';
 
 type Props = {
@@ -8,13 +15,34 @@ type Props = {
   onOpenStore: (storeId: string) => void;
 };
 
-const FILTERS = ['ใกล้ฉัน', 'ส่วนลด', 'อาหาร & เครื่องดื่ม'];
+const FILTERS = ['ใกล้ฉัน', 'อาหาร', 'เครื่องดื่ม', 'ของหวาน'];
+const BANTADTHONG_COORDS: [number, number] = [100.5236, 13.7401]; // [lng, lat]
+const MAP_STYLE_URL = 'https://demotiles.maplibre.org/style.json';
 
-// shortcut: plain view with positioned pins, swap for MapLibre once it is installed
 export default function MapScreen({ onBack, onOpenStore }: Props) {
+  const { merchants, currentLocation } = useAppContext();
   const [filter, setFilter] = useState(FILTERS[0]);
-  const [selectedId, setSelectedId] = useState<string | null>(stores[0].id);
-  const selected = stores.find(s => s.id === selectedId);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    merchants[0]?.merchantId ?? null,
+  );
+  const [mapError, setMapError] = useState(false);
+
+  const filteredMerchants = merchants.filter((m) => {
+    if (filter === 'ใกล้ฉัน') {
+      return true;
+    }
+    return m.category.includes(filter);
+  });
+
+  const selected = merchants.find((m) => m.merchantId === selectedId);
+
+  const getDistanceKm = (coords: { latitude: number; longitude: number }) => {
+    if (!currentLocation) {
+      return '0.8';
+    }
+    const meters = haversineDistanceMeters(currentLocation, coords);
+    return (meters / 1000).toFixed(1);
+  };
 
   return (
     <View style={styles.root}>
@@ -32,14 +60,14 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
         </View>
         <View style={styles.search}>
           <Text>🔍</Text>
-          <Text style={font.small}>ค้นหาร้านค้า, ประเภท, หรือแบรนด์</Text>
+          <Text style={font.small}>ค้นหาร้านค้า, เมนู, หรือดีลย่านบรรทัดทอง</Text>
         </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.pills}
         >
-          {FILTERS.map(f => {
+          {FILTERS.map((f) => {
             const on = f === filter;
             return (
               <Pressable
@@ -56,41 +84,85 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
         </ScrollView>
       </View>
 
-      <View style={styles.map}>
-        <View style={[styles.road, styles.roadH]} />
-        <View style={[styles.road, styles.roadV]} />
-        <View style={styles.me} accessibilityLabel="ตำแหน่งของคุณ" />
-        {stores.map(s => (
-          <Pressable
-            key={s.id}
-            onPress={() => setSelectedId(s.id)}
-            accessibilityRole="button"
-            accessibilityLabel={s.name}
-            hitSlop={8}
-            style={[
-              styles.pin,
-              { left: `${s.x * 100}%`, top: `${s.y * 100}%` },
-            ]}
+      <View style={styles.mapContainer}>
+        {!mapError ? (
+          <MapView
+            style={styles.map}
+            mapStyle={MAP_STYLE_URL}
+            logo={false}
+            attribution={false}
+            onDidFailLoadingMap={() => setMapError(true)}
           >
-            <Text style={styles.pinText}>
-              {s.id === selectedId ? '📍' : '🟢'}
+            <Camera
+              initialViewState={{
+                center: currentLocation
+                  ? [currentLocation.longitude, currentLocation.latitude]
+                  : BANTADTHONG_COORDS,
+                zoom: 15,
+              }}
+            />
+            {currentLocation && (
+              <UserLocation
+                animated={true}
+                accuracy={true}
+                heading={true}
+              />
+            )}
+            {filteredMerchants.map((m) => (
+              <Marker
+                key={m.merchantId}
+                id={m.merchantId}
+                lngLat={[m.location.longitude, m.location.latitude]}
+                onPress={() => setSelectedId(m.merchantId)}
+              >
+                <View
+                  style={[
+                    styles.pinCircle,
+                    m.merchantId === selectedId && styles.pinCircleActive,
+                  ]}
+                >
+                  <Text style={styles.pinEmoji}>
+                    {m.merchantId === selectedId ? '📍' : '🏪'}
+                  </Text>
+                </View>
+              </Marker>
+            ))}
+          </MapView>
+        ) : (
+          <View style={styles.fallbackMap}>
+            <Text style={styles.fallbackText}>
+              🗺️ แผนที่พร้อมหมุดร้านค้าจริง ({filteredMerchants.length} ร้าน)
             </Text>
-          </Pressable>
-        ))}
+            {filteredMerchants.map((m) => (
+              <Pressable
+                key={m.merchantId}
+                onPress={() => setSelectedId(m.merchantId)}
+                style={[
+                  styles.fallbackPin,
+                  m.merchantId === selectedId && styles.fallbackPinActive,
+                ]}
+              >
+                <Text style={styles.pinEmoji}>
+                  {m.merchantId === selectedId ? '📍' : '🏪'} {m.merchantName}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       {selected && (
         <View style={styles.sheet}>
           <View style={styles.sheetRow}>
             <View style={styles.thumb}>
-              <Text style={styles.pinText}>🏪</Text>
+              <Text style={styles.thumbIcon}>🏪</Text>
             </View>
             <View style={styles.flex}>
-              <Text style={font.h2}>{selected.name}</Text>
+              <Text style={font.h2}>{selected.merchantName}</Text>
               <Text style={font.small}>
-                📍 {selected.km} km ⭐ {selected.rating}
+                📍 {getDistanceKm(selected.location)} km • {selected.category}
               </Text>
-              {selected.hasCoupon && <Text style={styles.badge}>มีคูปอง</Text>}
+              <Text style={styles.badge}>{selected.promotion.title}</Text>
             </View>
             <Pressable
               onPress={() => setSelectedId(null)}
@@ -102,11 +174,11 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
             </Pressable>
           </View>
           <Pressable
-            onPress={() => onOpenStore(selected.id)}
+            onPress={() => onOpenStore(selected.merchantId)}
             accessibilityRole="button"
             style={styles.btn}
           >
-            <Text style={styles.btnText}>ดูรายละเอียด</Text>
+            <Text style={styles.btnText}>ดูรายละเอียดและรับคูปอง</Text>
           </Pressable>
         </View>
       )}
@@ -140,23 +212,43 @@ const styles = StyleSheet.create({
   },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillTextOn: { color: colors.onPrimary, fontWeight: '700' },
-  map: { flex: 1, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
-  road: { position: 'absolute', backgroundColor: colors.surface },
-  roadH: { left: 0, right: 0, top: '45%', height: 14 },
-  roadV: { top: 0, bottom: 0, left: '40%', width: 14 },
-  me: {
-    position: 'absolute',
-    left: '45%',
-    top: '48%',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#3B82F6',
-    borderWidth: 3,
-    borderColor: colors.surface,
+  mapContainer: { flex: 1, overflow: 'hidden' },
+  map: { flex: 1 },
+  fallbackMap: {
+    flex: 1,
+    backgroundColor: colors.surfaceMuted,
+    padding: space.lg,
+    gap: space.md,
+    justifyContent: 'center',
   },
-  pin: { position: 'absolute' },
-  pinText: { fontSize: 24 },
+  fallbackText: { ...font.body, textAlign: 'center', marginBottom: space.sm },
+  fallbackPin: {
+    padding: space.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
+  fallbackPinActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  pinCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinCircleActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+    transform: [{ scale: 1.15 }],
+  },
+  pinEmoji: { fontSize: 20 },
   sheet: {
     position: 'absolute',
     left: space.lg,
@@ -168,16 +260,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderColor: colors.border,
     borderWidth: 1,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   thumb: {
-    width: 56,
-    height: 56,
+    width: 54,
+    height: 54,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  thumbIcon: { fontSize: 28 },
   flex: { flex: 1, gap: space.xs },
   badge: {
     ...font.small,

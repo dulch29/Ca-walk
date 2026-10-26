@@ -26,6 +26,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ActivityHistoryScreen from './src/screens/ActivityHistoryScreen';
 import ActivityDetailScreen from './src/screens/ActivityDetailScreen';
 import CouponHistoryScreen from './src/screens/CouponHistoryScreen';
+import { AppProvider } from './src/context/AppContext';
 import { colors } from './src/theme';
 
 type RootStack = {
@@ -209,32 +210,34 @@ const CouponHistoryRoute = ({ navigation }: Props<'CouponHistory'>) => (
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
-      <SafeAreaView style={styles.root}>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="GetStarted" component={GetStarted} />
-            <Stack.Screen name="Login" component={Login} />
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="Map" component={MapRoute} />
-            <Stack.Screen name="Store" component={StoreRoute} />
-            <Stack.Screen name="Wallet" component={WalletRoute} />
-            <Stack.Screen name="Missions" component={MissionsRoute} />
-            <Stack.Screen name="Coupons" component={CouponsRoute} />
-            <Stack.Screen name="RecordSummary" component={RecordSummaryRoute} />
-            <Stack.Screen name="RecordStory" component={RecordStoryRoute} />
-            <Stack.Screen name="RecordCamera" component={RecordCameraRoute} />
-            <Stack.Screen name="Profile" component={ProfileRoute} />
-            <Stack.Screen name="Settings" component={SettingsRoute} />
-            <Stack.Screen name="History" component={HistoryRoute} />
-            <Stack.Screen
-              name="ActivityDetail"
-              component={ActivityDetailRoute}
-            />
-            <Stack.Screen name="CouponHistory" component={CouponHistoryRoute} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </SafeAreaView>
+      <AppProvider>
+        <StatusBar barStyle="dark-content" />
+        <SafeAreaView style={styles.root}>
+          <NavigationContainer>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="GetStarted" component={GetStarted} />
+              <Stack.Screen name="Login" component={Login} />
+              <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="Map" component={MapRoute} />
+              <Stack.Screen name="Store" component={StoreRoute} />
+              <Stack.Screen name="Wallet" component={WalletRoute} />
+              <Stack.Screen name="Missions" component={MissionsRoute} />
+              <Stack.Screen name="Coupons" component={CouponsRoute} />
+              <Stack.Screen name="RecordSummary" component={RecordSummaryRoute} />
+              <Stack.Screen name="RecordStory" component={RecordStoryRoute} />
+              <Stack.Screen name="RecordCamera" component={RecordCameraRoute} />
+              <Stack.Screen name="Profile" component={ProfileRoute} />
+              <Stack.Screen name="Settings" component={SettingsRoute} />
+              <Stack.Screen name="History" component={HistoryRoute} />
+              <Stack.Screen
+                name="ActivityDetail"
+                component={ActivityDetailRoute}
+              />
+              <Stack.Screen name="CouponHistory" component={CouponHistoryRoute} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </SafeAreaView>
+      </AppProvider>
     </SafeAreaProvider>
   );
 }

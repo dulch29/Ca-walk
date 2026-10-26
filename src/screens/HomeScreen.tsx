@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import CatAvatar, { CatMood } from '../components/CatAvatar';
-import { coupons, quests, stores, wallet } from '../data/mock';
+import { useAppContext } from '../context/AppContext';
+import { quests } from '../data/mock';
+import { merchantToStore } from '../services/storeAdapter';
 import { font } from '../theme';
 import { styles } from './HomeScreen.styles';
 
@@ -12,6 +14,8 @@ type Props = {
 };
 
 export default function HomeScreen({ onNavigate }: Props) {
+  const { user, merchants, coupons: contextCoupons, currentLocation } =
+    useAppContext();
   const [mood, setMood] = useState<CatMood>('sit');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -32,8 +36,15 @@ export default function HomeScreen({ onNavigate }: Props) {
     timer.current = setTimeout(() => setMood('sit'), 1500);
   };
 
-  const goalPct = Math.min(1, wallet.km / wallet.nextGoalKm);
-  const daily = quests.filter(q => q.kind === 'daily');
+  const nextGoalKm = 10.0;
+  const km = user.redeemableDistanceKm;
+  const coins = Math.round(km * 10);
+  const goalPct = Math.min(1, km / nextGoalKm);
+  const daily = quests.filter((q) => q.kind === 'daily');
+
+  const displayStores = merchants.map((m) =>
+    merchantToStore(m, currentLocation),
+  );
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -75,8 +86,8 @@ export default function HomeScreen({ onNavigate }: Props) {
       >
         <Text style={styles.walletLabel}>👛 กระเป๋าระยะทาง</Text>
         <View style={styles.rowBetween}>
-          <Text style={styles.bigKm}>{wallet.km.toFixed(1)} km</Text>
-          <Text style={styles.walletCoins}>≈ {wallet.coins} 🪙</Text>
+          <Text style={styles.bigKm}>{km.toFixed(1)} km</Text>
+          <Text style={styles.walletCoins}>≈ {coins} 🪙</Text>
         </View>
         <View style={styles.trackLight}>
           <View style={[styles.fillLight, { width: `${goalPct * 100}%` }]} />
@@ -92,14 +103,11 @@ export default function HomeScreen({ onNavigate }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.hList}
       >
-        {daily.map(q => (
+        {daily.map((q) => (
           <View key={q.id} style={styles.questCard}>
             <Text style={styles.questIcon}>{q.icon}</Text>
             <Text style={font.body} numberOfLines={2}>
               {q.title}
-            </Text>
-            <Text style={font.small}>
-              {q.progress} / {q.goal} {q.unit}
             </Text>
             <View style={styles.track}>
               <View
@@ -109,43 +117,64 @@ export default function HomeScreen({ onNavigate }: Props) {
                 ]}
               />
             </View>
-            <Text style={styles.reward}>🪙 +{q.reward}</Text>
+            <View style={styles.rowBetween}>
+              <Text style={font.small}>
+                {q.progress}/{q.goal} {q.unit}
+              </Text>
+              <Text style={styles.reward}>+{q.reward} 🪙</Text>
+            </View>
           </View>
         ))}
       </ScrollView>
 
       <SectionHeader
-        title="🎟️ คูปองของฉัน"
+        title="🎟️ คูปองในกระเป๋าของคุณ"
         onMore={() => onNavigate('coupons')}
       />
-      {[coupons[0], coupons[3]].map(c => {
-        const usable = c.status === 'usable';
-        return (
-          <View key={c.id} style={styles.coupon}>
-            <View style={styles.flex}>
-              <Text style={[styles.tag, usable ? styles.tagOn : styles.tagOff]}>
-                {usable ? 'ใช้งานได้' : 'ยังไม่ปลดล็อก'}
-              </Text>
-              <Text style={font.h2}>{c.title}</Text>
-              <Text style={font.body}>{c.store}</Text>
-              <Text style={font.small}>📅 หมดอายุ {c.expires}</Text>
-            </View>
-            <Pressable
-              onPress={() => onNavigate('coupons')}
-              accessibilityRole="button"
-              style={[styles.couponBtn, !usable && styles.couponBtnOutline]}
-            >
-              <Text
-                style={
-                  usable ? styles.couponBtnText : styles.couponBtnTextOutline
-                }
+      {contextCoupons.length === 0 ? (
+        <View style={styles.coupon}>
+          <Text style={font.small}>
+            ยังไม่มีคูปองในกระเป๋า แวะดูร้านค้าแล้วนำระยะทางไปแลกได้เลย!
+          </Text>
+        </View>
+      ) : (
+        contextCoupons.slice(0, 2).map((c) => {
+          const usable = c.status === 'unlocked';
+          return (
+            <View key={c.couponId} style={styles.coupon}>
+              <View style={styles.flex}>
+                <Text
+                  style={[styles.tag, usable ? styles.tagOn : styles.tagOff]}
+                >
+                  {usable ? 'ใช้งานได้' : 'ใช้แล้ว'}
+                </Text>
+                <Text style={font.h2}>{c.dealTitle}</Text>
+                <Text style={font.body}>{c.merchantName}</Text>
+                <Text style={font.small}>
+                  📅 หมดอายุ{' '}
+                  {new Date(c.expiresAt).toLocaleDateString('th-TH')}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => onNavigate('coupons')}
+                accessibilityRole="button"
+                style={[
+                  styles.couponBtn,
+                  !usable && styles.couponBtnOutline,
+                ]}
               >
-                {usable ? 'ใช้คูปอง' : 'ดูเงื่อนไข'}
-              </Text>
-            </Pressable>
-          </View>
-        );
-      })}
+                <Text
+                  style={
+                    usable ? styles.couponBtnText : styles.couponBtnTextOutline
+                  }
+                >
+                  {usable ? 'ใช้คูปอง' : 'ดูรหัส'}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        })
+      )}
 
       <SectionHeader title="📍 ร้านค้าใกล้คุณ" />
       <ScrollView
@@ -153,7 +182,7 @@ export default function HomeScreen({ onNavigate }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.hList}
       >
-        {stores.map(s => (
+        {displayStores.map((s) => (
           <Pressable
             key={s.id}
             onPress={() => onNavigate('store', s.id)}
@@ -187,7 +216,7 @@ function SectionHeader({
       <Text style={font.h2}>{title}</Text>
       {onMore && (
         <Pressable onPress={onMore} accessibilityRole="button" hitSlop={8}>
-          <Text style={font.small}>ดูทั้งหมด ›</Text>
+          <Text style={styles.explore}>ทั้งหมด ›</Text>
         </Pressable>
       )}
     </View>

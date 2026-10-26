@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Pressable, Text, View } from 'react-native';
 import CatAvatar from '../components/CatAvatar';
+import { useAppContext } from '../context/AppContext';
 import { font } from '../theme';
 import { styles } from './RecordScreen.styles';
 
@@ -19,9 +20,6 @@ type Props = {
   onCamera: () => void;
 };
 
-// shortcut: simulated speed in m/s, replace with GPS + step sensor later
-const SPEED: Record<Sport, number> = { walk: 1.4, run: 2.8 };
-const STEP_M = 0.75;
 export const SPORT_LABEL: Record<Sport, string> = { walk: 'เดิน', run: 'วิ่ง' };
 export const SPORT_ICON: Record<Sport, string> = { walk: '🚶', run: '🏃' };
 
@@ -45,31 +43,65 @@ const BUBBLE: Record<Phase, string> = {
 };
 
 export default function RecordScreen({ onFinish, onCamera }: Props) {
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [sport, setSport] = useState<Sport | null>(null);
-  const [seconds, setSeconds] = useState(0);
+  const {
+    activeSession,
+    startRunSession,
+    endRunSession,
+    speedFraudActive,
+    trackingError,
+    addMockDistance,
+  } = useAppContext();
 
-  useEffect(() => {
-    if (phase !== 'recording') {
-      return;
-    }
-    const id = setInterval(() => setSeconds(s => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [phase]);
+  const [phase, setPhase] = useState<Phase>(() =>
+    activeSession ? 'recording' : 'idle',
+  );
+  const [sport, setSport] = useState<Sport | null>('walk');
 
-  const km = sport ? (seconds * SPEED[sport]) / 1000 : 0;
-  const steps = Math.round((km * 1000) / STEP_M);
+  const seconds = activeSession?.durationSeconds ?? 0;
+  const km = activeSession?.distanceKm ?? 0;
+  const steps = activeSession?.steps ?? 0;
+  const pace = activeSession?.currentPace ?? '--:--';
   const active = phase === 'recording' || phase === 'paused';
 
   const choose = (s: Sport) => {
     setSport(s);
     setPhase('ready');
   };
-  const finish = () => {
-    if (sport) {
-      onFinish({ sport, seconds, km, steps });
+
+  const handleStart = async () => {
+    try {
+      if (!activeSession) {
+        await startRunSession();
+      }
+      setPhase('recording');
+    } catch (e) {
+      Alert.alert(
+        'ขออภัย',
+        e instanceof Error ? e.message : 'ไม่สามารถเริ่มการบันทึกได้',
+      );
     }
-    setSeconds(0);
+  };
+
+  const handlePause = () => {
+    setPhase('paused');
+  };
+
+  const handleResume = () => {
+    setPhase('recording');
+  };
+
+  const handleFinish = () => {
+    const completed = endRunSession();
+    const finalSeconds = completed?.durationSeconds ?? seconds;
+    const finalKm = completed?.distanceKm ?? km;
+    const finalSteps = completed?.steps ?? steps;
+
+    onFinish({
+      sport: sport ?? 'walk',
+      seconds: finalSeconds,
+      km: finalKm,
+      steps: finalSteps,
+    });
     setPhase('ready');
   };
 
@@ -79,12 +111,31 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
         <Text style={font.title}>ออกเดินทาง</Text>
       </View>
 
+      {speedFraudActive && (
+        <View style={[styles.timerCard, styles.fraudCard]}>
+          <Text style={[styles.status, styles.fraudText]}>
+            🚨 ความเร็วเกิน 18 km/h! น้องแมววิ่งตามไม่ทัน
+          </Text>
+          <Text style={font.small}>
+            ระบบระงับการสะสมระยะทางชั่วคราวเพื่อป้องกันการขับขี่ยานพาหนะ
+          </Text>
+        </View>
+      )}
+
+      {trackingError && !speedFraudActive && (
+        <View style={[styles.timerCard, styles.warningCard]}>
+          <Text style={[styles.status, styles.warningText]}>
+            ⚠️ {trackingError}
+          </Text>
+        </View>
+      )}
+
       {active && (
         <View style={styles.timerCard}>
           <Text
             style={[styles.status, phase === 'paused' && styles.statusPaused]}
           >
-            {phase === 'paused' ? '⏸ หยุดชั่วคราว' : '● กำลังบันทึก...'}
+            {phase === 'paused' ? '⏸ หยุดชั่วคราว' : '● กำลังบันทึกจริง...'}
           </Text>
           <Text
             style={styles.timer}
@@ -106,20 +157,30 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
           <Text style={styles.poiIcon}>🏪</Text>
           <Text style={font.small}>7-Eleven</Text>
         </View>
-        {active && <Text style={styles.gps}>GPS ✓</Text>}
+        {active && <Text style={styles.gps}>GPS Track ✓</Text>}
         <View style={styles.bubble}>
-          <Text style={styles.bubbleText}>{BUBBLE[phase]}</Text>
+          <Text style={styles.bubbleText}>
+            {speedFraudActive ? 'เมี้ยว! วิ่งเร็วเกินไปแล้ว~' : BUBBLE[phase]}
+          </Text>
         </View>
-        <CatAvatar
-          size={110}
-          mood={
-            phase === 'recording'
-              ? 'walk'
-              : phase === 'paused'
-              ? 'sleep'
-              : 'sit'
-          }
-        />
+        <Pressable
+          onPress={() => active && addMockDistance(0.2)}
+          accessibilityRole="button"
+          accessibilityLabel="เร่งระยะทางแมวสำหรับเดโม"
+        >
+          <CatAvatar
+            size={110}
+            mood={
+              speedFraudActive
+                ? 'jump'
+                : phase === 'recording'
+                ? 'walk'
+                : phase === 'paused'
+                ? 'sleep'
+                : 'sit'
+            }
+          />
+        </Pressable>
       </View>
 
       {active && (
@@ -127,15 +188,17 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
           <View style={styles.statRow}>
             <Stat label="ระยะทาง" value={km.toFixed(2)} unit="km" />
             <Stat label="ก้าว" value={steps.toLocaleString()} />
-            <Stat label="Pace" value={fmtPace(seconds, km)} unit="/km" />
+            <Stat label="Pace" value={pace} />
           </View>
-          <Text style={font.small}>📍 Bangkok, Thailand</Text>
+          <Text style={font.small}>
+            📍 บันทึกพิกัด GPS และตัวนับก้าว Accelerometer จริง
+          </Text>
         </View>
       )}
 
       {phase === 'pick' && (
         <View style={styles.controls}>
-          {(['walk', 'run'] as Sport[]).map(s => (
+          {(['walk', 'run'] as Sport[]).map((s) => (
             <Ctrl
               key={s}
               label={SPORT_LABEL[s]}
@@ -155,7 +218,7 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
             onPress={() => setPhase('pick')}
           />
           <Pressable
-            onPress={() => (sport ? setPhase('recording') : setPhase('pick'))}
+            onPress={sport ? handleStart : () => setPhase('pick')}
             accessibilityRole="button"
             accessibilityLabel="เริ่ม"
             style={[styles.big, !sport && styles.bigDisabled]}
@@ -169,7 +232,7 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
       {phase === 'recording' && (
         <View style={styles.controls}>
           <Pressable
-            onPress={() => setPhase('paused')}
+            onPress={handlePause}
             accessibilityRole="button"
             accessibilityLabel="หยุดชั่วคราว"
             style={styles.pausePill}
@@ -189,13 +252,8 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
 
       {phase === 'paused' && (
         <View style={styles.controls}>
-          <Ctrl
-            label="ไปต่อ"
-            icon="▶"
-            on
-            onPress={() => setPhase('recording')}
-          />
-          <Ctrl label="จบ" icon="■" danger onPress={finish} />
+          <Ctrl label="ไปต่อ" icon="▶" on onPress={handleResume} />
+          <Ctrl label="จบ" icon="■" danger onPress={handleFinish} />
         </View>
       )}
     </View>
