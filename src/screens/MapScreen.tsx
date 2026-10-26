@@ -20,7 +20,7 @@ const BANTADTHONG_COORDS: [number, number] = [100.5236, 13.7401]; // [lng, lat]
 const MAP_STYLE_URL = 'https://demotiles.maplibre.org/style.json';
 
 export default function MapScreen({ onBack, onOpenStore }: Props) {
-  const { merchants, currentLocation } = useAppContext();
+  const { merchants, currentLocation, warpToMerchant } = useAppContext();
   const [filter, setFilter] = useState(FILTERS[0]);
   const [selectedId, setSelectedId] = useState<string | null>(
     merchants[0]?.merchantId ?? null,
@@ -159,7 +159,7 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
             </View>
             <View style={styles.flex}>
               <Text style={font.h2}>{selected.merchantName}</Text>
-              <Text style={font.small}>
+              <Text style={font.caption}>
                 📍 {getDistanceKm(selected.location)} km • {selected.category}
               </Text>
               <Text style={styles.badge}>{selected.promotion.title}</Text>
@@ -167,19 +167,30 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
             <Pressable
               onPress={() => setSelectedId(null)}
               accessibilityRole="button"
-              accessibilityLabel="ปิด"
+              accessibilityLabel="ปิดการเลือก"
               hitSlop={8}
             >
               <Text style={font.h2}>✕</Text>
             </Pressable>
           </View>
-          <Pressable
-            onPress={() => onOpenStore(selected.merchantId)}
-            accessibilityRole="button"
-            style={styles.btn}
-          >
-            <Text style={styles.btnText}>ดูรายละเอียดและรับคูปอง</Text>
-          </Pressable>
+          <View style={styles.sheetActions}>
+            <Pressable
+              onPress={() => warpToMerchant(selected.merchantId)}
+              accessibilityRole="button"
+              accessibilityLabel="วาร์ปไปหน้าร้านสำหรับเดโม"
+              style={[styles.btn, styles.warpBtn]}
+            >
+              <Text style={styles.warpBtnText}>📍 วาร์ปไปร้าน</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onOpenStore(selected.merchantId)}
+              accessibilityRole="button"
+              accessibilityLabel="ดูรายละเอียดและรับคูปอง"
+              style={[styles.btn, styles.primaryBtn]}
+            >
+              <Text style={styles.btnText}>ดูร้าน & แลกดีล ›</Text>
+            </Pressable>
+          </View>
         </View>
       )}
     </View>
@@ -267,6 +278,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  sheetActions: { flexDirection: 'row', gap: space.sm },
   thumb: {
     width: 54,
     height: 54,
@@ -284,10 +296,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   btn: {
-    backgroundColor: colors.primary,
     borderRadius: radius.pill,
     paddingVertical: space.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
   },
-  btnText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
+  warpBtn: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    flex: 1,
+  },
+  warpBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  primaryBtn: {
+    backgroundColor: colors.primary,
+    flex: 1.3,
+  },
+  btnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
 });

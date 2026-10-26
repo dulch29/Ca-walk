@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
+import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import {
@@ -7,7 +7,10 @@ import {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+} from '@react-navigation/bottom-tabs';
 import GetStartedScreen from './src/screens/GetStartedScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -99,14 +102,95 @@ function MeTab() {
   );
 }
 
+function FloatingPillTabBar({ state, navigation }: BottomTabBarProps) {
+  return (
+    <View style={tabStyles.pillContainer}>
+      {state.routes.map((route, index) => {
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        if (route.name === 'Record') {
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              accessibilityRole="button"
+              accessibilityLabel="ออกเดินทาง บันทึกกิจกรรม"
+              style={tabStyles.recordBtnWrapper}
+            >
+              <View
+                style={[
+                  tabStyles.recordBtn,
+                  isFocused && tabStyles.recordBtnActive,
+                ]}
+              >
+                <Text style={tabStyles.recordIcon}>🐾</Text>
+              </View>
+              <Text
+                style={[
+                  tabStyles.tabLabel,
+                  isFocused && tabStyles.tabLabelActive,
+                ]}
+              >
+                ออกเดินทาง
+              </Text>
+            </Pressable>
+          );
+        }
+
+        const isHome = route.name === 'Home';
+        const icon = isHome ? '🏠' : '👤';
+        const label = isHome ? 'หน้าหลัก' : 'ฉัน';
+
+        return (
+          <Pressable
+            key={route.key}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            style={tabStyles.tabItem}
+          >
+            <Text
+              style={[tabStyles.tabIcon, isFocused && tabStyles.tabIconActive]}
+            >
+              {icon}
+            </Text>
+            <Text
+              style={[
+                tabStyles.tabLabel,
+                isFocused && tabStyles.tabLabelActive,
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const renderFloatingTabBar = (props: BottomTabBarProps) => (
+  <FloatingPillTabBar {...props} />
+);
+
 function MainTabs() {
   return (
     <Tab.Navigator
+      tabBar={renderFloatingTabBar}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.surface },
       }}
     >
       <Tab.Screen name="Home" component={HomeTab} />
@@ -244,4 +328,78 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+});
+
+const tabStyles = StyleSheet.create({
+  pillContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 20,
+    right: 20,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 12,
+    elevation: 8,
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+  tabIcon: {
+    fontSize: 20,
+    opacity: 0.6,
+  },
+  tabIconActive: {
+    opacity: 1,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  tabLabelActive: {
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  recordBtnWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -18,
+  },
+  recordBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    borderWidth: 3,
+    borderColor: colors.bg,
+  },
+  recordBtnActive: {
+    backgroundColor: colors.primaryDark,
+    transform: [{ scale: 1.05 }],
+  },
+  recordIcon: {
+    fontSize: 24,
+  },
 });

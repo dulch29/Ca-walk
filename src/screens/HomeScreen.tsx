@@ -36,10 +36,8 @@ export default function HomeScreen({ onNavigate }: Props) {
     timer.current = setTimeout(() => setMood('sit'), 1500);
   };
 
-  const nextGoalKm = 10.0;
   const km = user.redeemableDistanceKm;
   const coins = Math.round(km * 10);
-  const goalPct = Math.min(1, km / nextGoalKm);
   const daily = quests.filter((q) => q.kind === 'daily');
 
   const displayStores = merchants.map((m) =>
@@ -48,54 +46,104 @@ export default function HomeScreen({ onNavigate }: Props) {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <Text style={font.title}>Ca-Walk</Text>
+      {/* 1. Top Bar Greeting & Coin Badge */}
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.greetingTitle}>
+            สวัสดี, {user.displayName || 'น้องแมว'} 🐾
+          </Text>
+          <Text style={styles.greetingSubtitle}>
+            ก้าวเล็ก ๆ ที่พาไปไกลกว่าเดิม
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => onNavigate('wallet')}
+          accessibilityRole="button"
+          accessibilityLabel="เหรียญสะสมของคุณ"
+          style={styles.coinBadge}
+        >
+          <Text style={styles.coinBadgeText}>🪙 {coins}</Text>
+        </Pressable>
+      </View>
 
+      {/* 2. Hero Cat Card with embedded stats */}
       <Pressable
         onPress={petCat}
         accessibilityRole="button"
-        accessibilityLabel="ลูบแมว"
-        style={styles.catCard}
+        accessibilityLabel="ลูบแมวเพื่อเล่นด้วย"
+        style={styles.heroCard}
       >
-        <CatAvatar size={120} mood={mood} />
-        <Text style={styles.catHint}>
-          {mood === 'touch'
-            ? 'เมี้ยว~ วันนี้ไปไหนกันดี?'
-            : 'แตะเพื่อเล่นกับแมว'}
-        </Text>
+        <View style={styles.speechBubble}>
+          <Text style={styles.speechText}>
+            {mood === 'touch'
+              ? 'เมี้ยว~ วันนี้ไปเดินเล่นกันนะ!'
+              : 'แตะตัวน้องแมวเพื่อเล่นด้วยกัน'}
+          </Text>
+        </View>
+
+        <View style={styles.catContainer}>
+          <CatAvatar size={130} mood={mood} />
+        </View>
+
+        <View style={styles.heroStatsRow}>
+          <Pressable
+            onPress={() => onNavigate('wallet')}
+            style={styles.heroStatItem}
+            accessibilityRole="button"
+            accessibilityLabel="ระยะทางสะสม"
+          >
+            <Text style={styles.heroStatLabel}>ระยะสะสม</Text>
+            <Text style={styles.heroStatValue}>{km.toFixed(1)} km</Text>
+          </Pressable>
+
+          <View style={styles.heroStatDivider} />
+
+          <Pressable
+            onPress={() => onNavigate('wallet')}
+            style={styles.heroStatItem}
+            accessibilityRole="button"
+            accessibilityLabel="เหรียญสะสม"
+          >
+            <Text style={styles.heroStatLabel}>เหรียญ</Text>
+            <Text style={styles.heroStatValue}>{coins} 🪙</Text>
+          </Pressable>
+        </View>
       </Pressable>
 
-      {/* search is "talking to the cat"; it opens the map */}
+      {/* 3. Search Bar Pill */}
       <Pressable
         onPress={() => onNavigate('map')}
         accessibilityRole="search"
         accessibilityLabel="ค้นหาร้านค้า คูปอง หรือสถานที่"
-        style={styles.search}
+        style={styles.searchBar}
       >
         <Text style={font.body}>🔍</Text>
-        <Text style={[font.small, styles.flex]}>
+        <Text style={[styles.searchPlaceholder, styles.flex]}>
           ค้นหาร้านค้า คูปอง หรือสถานที่
         </Text>
-        <Text style={styles.explore}>Explore</Text>
+        <Text style={styles.searchPillBtn}>สำรวจ</Text>
       </Pressable>
 
+      {/* 4. Special Event Banner (Wireframe Screen 8) */}
       <Pressable
-        onPress={() => onNavigate('wallet')}
+        onPress={() => onNavigate('missions')}
         accessibilityRole="button"
-        accessibilityLabel="กระเป๋าระยะทาง"
-        style={styles.walletCard}
+        accessibilityLabel="กิจกรรมพิเศษ สะสมก้าวแลกรางวัล"
+        style={styles.eventBanner}
       >
-        <Text style={styles.walletLabel}>👛 กระเป๋าระยะทาง</Text>
-        <View style={styles.rowBetween}>
-          <Text style={styles.bigKm}>{km.toFixed(1)} km</Text>
-          <Text style={styles.walletCoins}>≈ {coins} 🪙</Text>
-        </View>
-        <View style={styles.trackLight}>
-          <View style={[styles.fillLight, { width: `${goalPct * 100}%` }]} />
+        <Text style={styles.eventIcon}>🎁</Text>
+        <View style={styles.flex}>
+          <Text style={styles.eventBadge}>Special Event</Text>
+          <Text style={styles.eventTitle}>เดินสะสมระยะทางย่านบรรทัดทอง</Text>
+          <Text style={styles.eventSubtitle}>
+            รับคูปองส่วนลดสูงสุด 50% จากร้านค้าพาร์ทเนอร์
+          </Text>
         </View>
       </Pressable>
 
+      {/* 5. Daily Quests ("เควสประจำวัน") */}
       <SectionHeader
-        title="🎯 ภารกิจวันนี้"
+        title="เควสประจำวัน"
         onMore={() => onNavigate('missions')}
       />
       <ScrollView
@@ -105,8 +153,11 @@ export default function HomeScreen({ onNavigate }: Props) {
       >
         {daily.map((q) => (
           <View key={q.id} style={styles.questCard}>
-            <Text style={styles.questIcon}>{q.icon}</Text>
-            <Text style={font.body} numberOfLines={2}>
+            <View style={styles.questHeader}>
+              <Text style={styles.questIcon}>{q.icon}</Text>
+              <Text style={styles.reward}>+{q.reward} 🪙</Text>
+            </View>
+            <Text style={font.bodyMedium} numberOfLines={2}>
               {q.title}
             </Text>
             <View style={styles.track}>
@@ -118,23 +169,26 @@ export default function HomeScreen({ onNavigate }: Props) {
               />
             </View>
             <View style={styles.rowBetween}>
-              <Text style={font.small}>
+              <Text style={font.caption}>
                 {q.progress}/{q.goal} {q.unit}
               </Text>
-              <Text style={styles.reward}>+{q.reward} 🪙</Text>
+              <Text style={font.caption}>
+                {q.progress >= q.goal ? '✓ สำเร็จ' : 'กำลังทำ'}
+              </Text>
             </View>
           </View>
         ))}
       </ScrollView>
 
+      {/* 6. Coupons in Pocket */}
       <SectionHeader
-        title="🎟️ คูปองในกระเป๋าของคุณ"
+        title="คูปองในกระเป๋าของคุณ"
         onMore={() => onNavigate('coupons')}
       />
       {contextCoupons.length === 0 ? (
         <View style={styles.coupon}>
           <Text style={font.small}>
-            ยังไม่มีคูปองในกระเป๋า แวะดูร้านค้าแล้วนำระยะทางไปแลกได้เลย!
+            🎟️ ยังไม่มีคูปองในกระเป๋า แวะดูร้านค้าแล้วนำระยะทางไปแลกได้เลย!
           </Text>
         </View>
       ) : (
@@ -148,9 +202,9 @@ export default function HomeScreen({ onNavigate }: Props) {
                 >
                   {usable ? 'ใช้งานได้' : 'ใช้แล้ว'}
                 </Text>
-                <Text style={font.h2}>{c.dealTitle}</Text>
+                <Text style={font.h3}>{c.dealTitle}</Text>
                 <Text style={font.body}>{c.merchantName}</Text>
-                <Text style={font.small}>
+                <Text style={font.caption}>
                   📅 หมดอายุ{' '}
                   {new Date(c.expiresAt).toLocaleDateString('th-TH')}
                 </Text>
@@ -176,7 +230,11 @@ export default function HomeScreen({ onNavigate }: Props) {
         })
       )}
 
-      <SectionHeader title="📍 ร้านค้าใกล้คุณ" />
+      {/* 7. Partner Stores */}
+      <SectionHeader
+        title="ร้านค้าร่วมรายการ"
+        onMore={() => onNavigate('map')}
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -193,10 +251,13 @@ export default function HomeScreen({ onNavigate }: Props) {
             <View style={styles.storeImg}>
               <Text style={styles.questIcon}>🏪</Text>
             </View>
-            <Text style={font.body}>{s.name}</Text>
-            <Text style={font.small}>
+            <Text style={font.bodyMedium} numberOfLines={1}>
+              {s.name}
+            </Text>
+            <Text style={font.caption}>
               📍 {s.km} km ⭐ {s.rating}
             </Text>
+            <Text style={styles.storeDealBadge}>แลกส่วนลด</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -212,11 +273,11 @@ function SectionHeader({
   onMore?: () => void;
 }) {
   return (
-    <View style={styles.rowBetween}>
-      <Text style={font.h2}>{title}</Text>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
       {onMore && (
         <Pressable onPress={onMore} accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.explore}>ทั้งหมด ›</Text>
+          <Text style={styles.exploreLink}>ดูทั้งหมด ›</Text>
         </Pressable>
       )}
     </View>

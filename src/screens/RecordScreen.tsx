@@ -130,22 +130,78 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
         </View>
       )}
 
-      {active && (
-        <View style={styles.timerCard}>
-          <Text
-            style={[styles.status, phase === 'paused' && styles.statusPaused]}
+      {active ? (
+        <>
+          {/* Big Distance Display (Wireframe Screen 16) */}
+          <View style={styles.bigKmDisplay}>
+            <Text style={styles.bigKmValue}>{km.toFixed(2)}</Text>
+            <Text style={styles.bigKmUnit}>กิโลเมตร</Text>
+          </View>
+
+          {/* 3-Column Stats Card (Pace, Steps, Time) */}
+          <View style={styles.statsCard}>
+            <View style={styles.statCol}>
+              <Text style={styles.statColValue}>{steps.toLocaleString()}</Text>
+              <Text style={styles.statColLabel}>ก้าว</Text>
+            </View>
+            <View style={styles.statColDivider} />
+            <View style={styles.statCol}>
+              <Text style={styles.statColValue}>{pace}</Text>
+              <Text style={styles.statColLabel}>Pace (/km)</Text>
+            </View>
+            <View style={styles.statColDivider} />
+            <View style={styles.statCol}>
+              <Text style={styles.statColValue}>{fmtTime(seconds)}</Text>
+              <Text style={styles.statColLabel}>เวลา</Text>
+            </View>
+          </View>
+        </>
+      ) : (
+        /* Sport Selector (Wireframe Screen 15) */
+        <View style={styles.sportSelectorRow}>
+          <Pressable
+            onPress={() => choose('walk')}
+            accessibilityRole="button"
+            accessibilityLabel="เลือกเดิน"
+            style={[
+              styles.sportPill,
+              sport === 'walk' && styles.sportPillActive,
+            ]}
           >
-            {phase === 'paused' ? '⏸ หยุดชั่วคราว' : '● กำลังบันทึกจริง...'}
-          </Text>
-          <Text
-            style={styles.timer}
-            accessibilityLabel={`เวลา ${fmtTime(seconds)}`}
+            <Text style={styles.icon}>🚶</Text>
+            <Text
+              style={[
+                styles.sportPillText,
+                sport === 'walk' && styles.sportPillTextActive,
+              ]}
+            >
+              เดิน
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => choose('run')}
+            accessibilityRole="button"
+            accessibilityLabel="เลือกวิ่ง"
+            style={[
+              styles.sportPill,
+              sport === 'run' && styles.sportPillActive,
+            ]}
           >
-            {fmtTime(seconds)}
-          </Text>
+            <Text style={styles.icon}>🏃</Text>
+            <Text
+              style={[
+                styles.sportPillText,
+                sport === 'run' && styles.sportPillTextActive,
+              ]}
+            >
+              วิ่ง
+            </Text>
+          </Pressable>
         </View>
       )}
 
+      {/* Visual Track Area with Cat & Route */}
       <View style={styles.map}>
         <View style={[styles.road, styles.roadH]} />
         <View style={[styles.road, styles.roadV]} />
@@ -155,7 +211,7 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
         </View>
         <View style={[styles.poi, styles.poiShop]}>
           <Text style={styles.poiIcon}>🏪</Text>
-          <Text style={font.small}>7-Eleven</Text>
+          <Text style={font.small}>ร้านค้า</Text>
         </View>
         {active && <Text style={styles.gps}>GPS Track ✓</Text>}
         <View style={styles.bubble}>
@@ -169,7 +225,7 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
           accessibilityLabel="เร่งระยะทางแมวสำหรับเดโม"
         >
           <CatAvatar
-            size={110}
+            size={115}
             mood={
               speedFraudActive
                 ? 'jump'
@@ -183,67 +239,37 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
         </Pressable>
       </View>
 
-      {active && (
-        <View style={styles.stats}>
-          <View style={styles.statRow}>
-            <Stat label="ระยะทาง" value={km.toFixed(2)} unit="km" />
-            <Stat label="ก้าว" value={steps.toLocaleString()} />
-            <Stat label="Pace" value={pace} />
-          </View>
-          <Text style={font.small}>
-            📍 บันทึกพิกัด GPS และตัวนับก้าว Accelerometer จริง
-          </Text>
-        </View>
-      )}
-
-      {phase === 'pick' && (
-        <View style={styles.controls}>
-          {(['walk', 'run'] as Sport[]).map((s) => (
-            <Ctrl
-              key={s}
-              label={SPORT_LABEL[s]}
-              icon={SPORT_ICON[s]}
-              on={sport === s}
-              onPress={() => choose(s)}
-            />
-          ))}
-        </View>
-      )}
-
-      {(phase === 'idle' || phase === 'ready') && (
-        <View style={styles.controls}>
-          <Ctrl
-            label={sport ? SPORT_LABEL[sport] : 'เลือกกีฬา'}
-            icon={sport ? SPORT_ICON[sport] : '🎯'}
-            onPress={() => setPhase('pick')}
-          />
+      {/* Controls based on Phase */}
+      {!active && (
+        <View style={styles.controlsBottom}>
           <Pressable
-            onPress={sport ? handleStart : () => setPhase('pick')}
+            onPress={handleStart}
             accessibilityRole="button"
-            accessibilityLabel="เริ่ม"
-            style={[styles.big, !sport && styles.bigDisabled]}
+            accessibilityLabel="เริ่มออกเดินทาง"
+            style={styles.startActionBtn}
           >
-            <Text style={styles.pauseText}>เริ่ม</Text>
+            <Text style={styles.startActionText}>
+              เริ่มออกเดินทาง ({sport === 'walk' ? 'เดิน' : 'วิ่ง'})
+            </Text>
           </Pressable>
-          <Ctrl label="กล้อง" icon="📷" onPress={onCamera} />
         </View>
       )}
 
       {phase === 'recording' && (
-        <View style={styles.controls}>
+        <View style={styles.activeControlsRow}>
           <Pressable
             onPress={handlePause}
             accessibilityRole="button"
             accessibilityLabel="หยุดชั่วคราว"
-            style={styles.pausePill}
+            style={[styles.activeBtn, styles.activeBtnPause]}
           >
-            <Text style={styles.pauseText}>⏸ หยุดชั่วคราว</Text>
+            <Text style={styles.activeBtnText}>⏸ พักชั่วคราว</Text>
           </Pressable>
           <Pressable
             onPress={onCamera}
             accessibilityRole="button"
-            accessibilityLabel="กล้อง"
-            style={styles.camSquare}
+            accessibilityLabel="ถ่ายรูปกิจกรรม"
+            style={styles.camCircle}
           >
             <Text style={styles.icon}>📷</Text>
           </Pressable>
@@ -251,55 +277,33 @@ export default function RecordScreen({ onFinish, onCamera }: Props) {
       )}
 
       {phase === 'paused' && (
-        <View style={styles.controls}>
-          <Ctrl label="ไปต่อ" icon="▶" on onPress={handleResume} />
-          <Ctrl label="จบ" icon="■" danger onPress={handleFinish} />
+        <View style={styles.activeControlsRow}>
+          <Pressable
+            onPress={handleResume}
+            accessibilityRole="button"
+            accessibilityLabel="ไปต่อ"
+            style={[styles.activeBtn, styles.activeBtnResume]}
+          >
+            <Text style={styles.activeBtnText}>▶ ไปต่อ</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleFinish}
+            accessibilityRole="button"
+            accessibilityLabel="จบกิจกรรม"
+            style={[styles.activeBtn, styles.activeBtnFinish]}
+          >
+            <Text style={styles.activeBtnText}>⏹ จบกิจกรรม</Text>
+          </Pressable>
+          <Pressable
+            onPress={onCamera}
+            accessibilityRole="button"
+            accessibilityLabel="ถ่ายรูปกิจกรรม"
+            style={styles.camCircle}
+          >
+            <Text style={styles.icon}>📷</Text>
+          </Pressable>
         </View>
       )}
     </View>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-}) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statUnit}>{unit ? `${label} (${unit})` : label}</Text>
-    </View>
-  );
-}
-
-type CtrlProps = {
-  label: string;
-  icon: string;
-  on?: boolean;
-  danger?: boolean;
-  onPress: () => void;
-};
-
-function Ctrl({ label, icon, on, danger, onPress }: CtrlProps) {
-  const filled = on || danger;
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={styles.ctrl}
-    >
-      <View
-        style={[styles.round, on && styles.roundOn, danger && styles.finish]}
-      >
-        <Text style={filled ? styles.iconOn : styles.icon}>{icon}</Text>
-      </View>
-      <Text style={on ? styles.labelStrong : styles.label}>{label}</Text>
-    </Pressable>
   );
 }
