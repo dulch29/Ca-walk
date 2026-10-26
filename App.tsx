@@ -11,6 +11,7 @@ import {
   createBottomTabNavigator,
   type BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
+import Svg, { Circle, Path } from 'react-native-svg';
 import GetStartedScreen from './src/screens/GetStartedScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -102,13 +103,55 @@ function MeTab() {
   );
 }
 
-function FloatingPillTabBar({ state, navigation }: BottomTabBarProps) {
+function renderTabIcon(name: string, isFocused: boolean) {
+  const color = isFocused ? '#262A22' : '#8A8F85';
+  if (name === 'Home') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill={color}>
+        <Path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+      </Svg>
+    );
+  }
+  if (name === 'Record') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24">
+        <Circle cx="8" cy="7.5" r="1.8" fill={color} />
+        <Circle cx="12" cy="5.5" r="1.8" fill={color} />
+        <Circle cx="16" cy="7.5" r="1.8" fill={color} />
+        <Circle cx="5" cy="11.5" r="1.5" fill={color} />
+        <Circle cx="19" cy="11.5" r="1.5" fill={color} />
+        <Path
+          d="M12 11c-2.8 0-4.8 1.8-4.8 4.2 0 1.8 1.4 3.3 4.8 3.3s4.8-1.5 4.8-3.3c0-2.4-2-4.2-4.8-4.2z"
+          fill={color}
+        />
+      </Svg>
+    );
+  }
   return (
-    <View style={tabStyles.pillContainer}>
-      {state.routes.map((route, index) => {
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <Circle cx="12" cy="7" r="4" />
+    </Svg>
+  );
+}
+
+function FloatingPillTabBar({ state, navigation }: BottomTabBarProps) {
+  const tabs = [
+    { name: 'Home', label: 'Home' },
+    { name: 'Record', label: 'Record' },
+    { name: 'Me', label: 'Me' },
+  ];
+
+  return (
+    <View style={tabStyles.bottomBarContainer}>
+      {tabs.map((tab, index) => {
         const isFocused = state.index === index;
+        const route = state.routes[index];
 
         const onPress = () => {
+          if (!route) {
+            return;
+          }
           const event = navigation.emit({
             type: 'tabPress',
             target: route.key,
@@ -116,63 +159,26 @@ function FloatingPillTabBar({ state, navigation }: BottomTabBarProps) {
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            navigation.navigate(tab.name);
           }
         };
 
-        if (route.name === 'Record') {
-          return (
-            <Pressable
-              key={route.key}
-              onPress={onPress}
-              accessibilityRole="button"
-              accessibilityLabel="ออกเดินทาง บันทึกกิจกรรม"
-              style={tabStyles.recordBtnWrapper}
-            >
-              <View
-                style={[
-                  tabStyles.recordBtn,
-                  isFocused && tabStyles.recordBtnActive,
-                ]}
-              >
-                <Text style={tabStyles.recordIcon}>🐾</Text>
-              </View>
-              <Text
-                style={[
-                  tabStyles.tabLabel,
-                  isFocused && tabStyles.tabLabelActive,
-                ]}
-              >
-                ออกเดินทาง
-              </Text>
-            </Pressable>
-          );
-        }
-
-        const isHome = route.name === 'Home';
-        const icon = isHome ? '🏠' : '👤';
-        const label = isHome ? 'หน้าหลัก' : 'ฉัน';
-
         return (
           <Pressable
-            key={route.key}
+            key={tab.name}
             onPress={onPress}
             accessibilityRole="button"
-            accessibilityLabel={label}
+            accessibilityLabel={tab.label}
             style={tabStyles.tabItem}
           >
-            <Text
-              style={[tabStyles.tabIcon, isFocused && tabStyles.tabIconActive]}
-            >
-              {icon}
-            </Text>
+            {renderTabIcon(tab.name, isFocused)}
             <Text
               style={[
                 tabStyles.tabLabel,
                 isFocused && tabStyles.tabLabelActive,
               ]}
             >
-              {label}
+              {tab.label}
             </Text>
           </Pressable>
         );
@@ -331,75 +337,42 @@ const styles = StyleSheet.create({
 });
 
 const tabStyles = StyleSheet.create({
-  pillContainer: {
+  bottomBarContainer: {
     position: 'absolute',
-    bottom: 16,
-    left: 20,
-    right: 20,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 68,
+    backgroundColor: '#FAF6ED',
+    borderTopWidth: 1.5,
+    borderTopColor: '#ECE4D6',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 12,
-    elevation: 8,
-    shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    paddingHorizontal: 20,
+    paddingBottom: 6,
+    elevation: 10,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
     shadowRadius: 10,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-  },
-  tabIcon: {
-    fontSize: 20,
-    opacity: 0.6,
-  },
-  tabIconActive: {
-    opacity: 1,
+    paddingVertical: 4,
+    gap: 3,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textMuted,
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8A8F85',
   },
   tabLabelActive: {
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  recordBtnWrapper: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -18,
-  },
-  recordBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    borderWidth: 3,
-    borderColor: colors.bg,
-  },
-  recordBtnActive: {
-    backgroundColor: colors.primaryDark,
-    transform: [{ scale: 1.05 }],
-  },
-  recordIcon: {
-    fontSize: 24,
+    fontWeight: '800',
+    color: '#262A22',
   },
 });
