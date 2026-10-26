@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import CatAvatar, { CatMood } from '../components/CatAvatar';
+import { AmazonLogo, KfcLogo, SevenElevenLogo } from '../components/BrandLogos';
 import { useAppContext } from '../context/AppContext';
 import { styles } from './HomeScreen.styles';
 
@@ -225,67 +226,14 @@ function FilterSlidersIcon() {
 }
 
 // 5. Official-style Store Brand Logo Badges
-function SevenElevenBadge() {
-  return (
-    <View style={localStyles.badgeWrapper}>
-      <Svg width={36} height={36} viewBox="0 0 36 36">
-        <Rect x="0" y="0" width="36" height="36" rx="8" fill="#FFFFFF" stroke="#008450" strokeWidth="1.5" />
-        <Rect x="3" y="3" width="30" height="30" rx="6" fill="#008450" />
-        <Path
-          d="M 8 9 L 28 9 L 19 28"
-          stroke="#EE7623"
-          strokeWidth="3.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <Path d="M 11 18 L 24 18" stroke="#ED1C24" strokeWidth="2.8" strokeLinecap="round" />
-        <Path d="M 12 18 L 23 18" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" />
-      </Svg>
-    </View>
-  );
-}
-
-function AmazonBadge() {
-  return (
-    <View style={localStyles.badgeWrapper}>
-      <Svg width={44} height={36} viewBox="0 0 44 36">
-        <Rect x="0" y="0" width="44" height="36" rx="18" fill="#FAF6ED" stroke="#183B22" strokeWidth="1.5" />
-        <Rect x="2" y="2" width="40" height="32" rx="16" fill="#183B22" />
-        {/* Yellow parrot */}
-        <Circle cx="15" cy="15" r="5.5" fill="#F5A623" />
-        <Path d="M 18 12 Q 24 11 25 15 Q 20 18 18 15 Z" fill="#EE4B2B" />
-        {/* Amazon script wave */}
-        <Path d="M 18 22 Q 25 19 33 23" stroke="#F5A623" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-        <Path d="M 20 22 Q 26 20 32 23" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-      </Svg>
-    </View>
-  );
-}
-
-function KFCBadge() {
-  return (
-    <View style={localStyles.badgeWrapper}>
-      <Svg width={36} height={36} viewBox="0 0 36 36">
-        <Rect x="0" y="0" width="36" height="36" rx="8" fill="#A3080C" stroke="#FFFFFF" strokeWidth="1" />
-        <Circle cx="18" cy="13" r="5.5" fill="#FFFFFF" />
-        <Path d="M 13 26 C 13 20 23 20 23 26 Z" fill="#FFFFFF" />
-        <Path d="M 16 18 L 20 18 L 18 20.5 Z" fill="#262A22" />
-        <Circle cx="16" cy="12.5" r="0.9" fill="#262A22" />
-        <Circle cx="20" cy="12.5" r="0.9" fill="#262A22" />
-      </Svg>
-    </View>
-  );
-}
-
 function StoreBrandBadge({ type }: { type: '7eleven' | 'amazon' | 'kfc' }) {
   if (type === '7eleven') {
-    return <SevenElevenBadge />;
+    return <SevenElevenLogo size={36} />;
   }
   if (type === 'amazon') {
-    return <AmazonBadge />;
+    return <AmazonLogo size={36} />;
   }
-  return <KFCBadge />;
+  return <KfcLogo size={36} />;
 }
 
 // 6. Vector Mission Icons
@@ -729,13 +677,3 @@ export default function HomeScreen({ onNavigate }: Props) {
     </ScrollView>
   );
 }
-
-const localStyles = StyleSheet.create({
-  badgeWrapper: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-});
