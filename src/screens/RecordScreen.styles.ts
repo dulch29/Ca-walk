@@ -528,4 +528,50 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#2E3D22',
   },
+
+  // Map Floating Utility Controls (Re-center, Zoom)
+  mapControlsColumn: {
+    position: 'absolute',
+    right: space.lg,
+    bottom: Platform.OS === 'android' ? 245 : 260,
+    zIndex: 22,
+    gap: 8,
+  },
+  mapFloatingBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+    elevation: 4,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+  },
+  mapFloatingBtnActive: {
+    backgroundColor: '#374B2A',
+    borderColor: '#374B2A',
+  },
+  startPinWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startPinBadge: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+  },
+  startPinText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
 });

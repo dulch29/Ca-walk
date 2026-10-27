@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -9,11 +9,12 @@ import {
 import {
   Map as MapView,
   Camera,
+  CameraRef,
   Marker,
   GeoJSONSource,
   Layer,
 } from '@maplibre/maplibre-react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Path } from 'react-native-svg';
 import CatAvatar from '../components/CatAvatar';
 import { useAppContext } from '../context/AppContext';
 import { styles } from './RecordScreen.styles';
@@ -61,7 +62,33 @@ const BUBBLE: Record<Phase, string> = {
 // Bangkok Lumpini / Bantadthong center coordinates [lng, lat]
 const BANGKOK_COORDS: [number, number] = [100.5417, 13.7314];
 
-// OpenStreetMap raster tiles style (100% open, reliable, accurate, no API key required)
+// CartoDB Voyager High-DPI tiles (warm, crisp outdoor aesthetic matching Ca-walk brand)
+const CARTO_VOYAGER_STYLE = JSON.stringify({
+  version: 8,
+  sources: {
+    'carto-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution: '© CartoDB, © OpenStreetMap contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'carto-tiles-layer',
+      type: 'raster',
+      source: 'carto-tiles',
+      minzoom: 0,
+      maxzoom: 20,
+    },
+  ],
+});
+
+// Standard OpenStreetMap raster tiles (reliable open fallback)
 const OSM_STYLE = JSON.stringify({
   version: 8,
   sources: {
@@ -87,9 +114,17 @@ const OSM_STYLE = JSON.stringify({
   ],
 });
 
+// High-contrast double-layer route polyline
+const ROUTE_CASING_STYLE = {
+  lineColor: '#17361A',
+  lineWidth: 8,
+  lineCap: 'round',
+  lineJoin: 'round',
+} as const;
+
 const ROUTE_LINE_STYLE = {
   lineColor: '#38A169',
-  lineWidth: 6,
+  lineWidth: 5,
   lineCap: 'round',
   lineJoin: 'round',
 } as const;
@@ -110,6 +145,9 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   );
   const [sport, setSport] = useState<Sport>('walk');
   const [mapError, setMapError] = useState(false);
+  const [mapTheme, setMapTheme] = useState<'voyager' | 'osm'>('voyager');
+  const [currentZoom, setCurrentZoom] = useState(16);
+  const cameraRef = useRef<CameraRef>(null);
 
   const seconds =
     activeSession?.durationSeconds ??
@@ -184,6 +222,27 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
     setPhase('recording');
   };
 
+  const handleRecenter = () => {
+    cameraRef.current?.flyTo({
+      center: currentLngLat,
+      zoom: 16,
+      duration: 600,
+    });
+    setCurrentZoom(16);
+  };
+
+  const handleZoomIn = () => {
+    const nextZoom = Math.min(currentZoom + 1, 19);
+    setCurrentZoom(nextZoom);
+    cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
+  };
+
+  const handleZoomOut = () => {
+    const nextZoom = Math.max(currentZoom - 1, 12);
+    setCurrentZoom(nextZoom);
+    cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
+  };
+
   const handleFinish = () => {
     const completed = endRunSession();
     const finalSeconds = completed?.durationSeconds ?? seconds;
@@ -201,27 +260,34 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Real Google Map Container */}
+      {/* Real Map Container */}
       <View style={styles.mapContainer}>
         {!mapError ? (
           <MapView
             style={styles.mapView}
-            mapStyle={OSM_STYLE}
+            mapStyle={mapTheme === 'voyager' ? CARTO_VOYAGER_STYLE : OSM_STYLE}
             logo={false}
             attribution={false}
-            onDidFailLoadingMap={() => setMapError(true)}
+            onDidFailLoadingMap={() => {
+              if (mapTheme === 'voyager') {
+                setMapTheme('osm');
+              } else {
+                setMapError(true);
+              }
+            }}
           >
             <Camera
+              ref={cameraRef}
               initialViewState={{
                 center: currentLngLat,
                 zoom: 16,
               }}
               center={currentLngLat}
-              zoom={16}
-              minZoom={13}
+              zoom={currentZoom}
+              minZoom={12}
             />
 
-            {/* Real GPS Route Polyline Trail on Actual Streets */}
+            {/* Real GPS Route Polyline Trail on Actual Streets with high-contrast casing */}
             {active && routeCoords.length > 1 && (
               <GeoJSONSource
                 id="live-route-source"
@@ -235,11 +301,27 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 }}
               >
                 <Layer
+                  id="live-route-casing"
+                  type="line"
+                  style={ROUTE_CASING_STYLE}
+                />
+                <Layer
                   id="live-route-line"
                   type="line"
                   style={ROUTE_LINE_STYLE}
                 />
               </GeoJSONSource>
+            )}
+
+            {/* Start point badge */}
+            {active && routeCoords.length > 0 && (
+              <Marker id="route-start-pin" lngLat={routeCoords[0]}>
+                <View style={styles.startPinWrap}>
+                  <View style={styles.startPinBadge}>
+                    <Text style={styles.startPinText}>🏁 เริ่มต้น</Text>
+                  </View>
+                </View>
+              </Marker>
             )}
 
             {/* User GPS Cat Marker replacing standard blue dot */}
@@ -375,6 +457,47 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           </View>
         </View>
       )}
+
+      {/* Floating Map Utility Buttons (Recenter & Zoom) */}
+      <View style={styles.mapControlsColumn}>
+        <Pressable
+          onPress={handleRecenter}
+          accessibilityRole="button"
+          accessibilityLabel="จัดตำแหน่งกึ่งกลางที่ตัวแมว"
+          style={styles.mapFloatingBtn}
+        >
+          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.2}>
+            <Circle cx="12" cy="12" r="8" />
+            <Line x1="12" y1="2" x2="12" y2="6" strokeLinecap="round" />
+            <Line x1="12" y1="18" x2="12" y2="22" strokeLinecap="round" />
+            <Line x1="2" y1="12" x2="6" y2="12" strokeLinecap="round" />
+            <Line x1="18" y1="12" x2="22" y2="12" strokeLinecap="round" />
+            <Circle cx="12" cy="12" r="2.5" fill="#38A169" />
+          </Svg>
+        </Pressable>
+
+        <Pressable
+          onPress={handleZoomIn}
+          accessibilityRole="button"
+          accessibilityLabel="ซูมเข้า"
+          style={styles.mapFloatingBtn}
+        >
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.5}>
+            <Path d="M12 5v14M5 12h14" strokeLinecap="round" />
+          </Svg>
+        </Pressable>
+
+        <Pressable
+          onPress={handleZoomOut}
+          accessibilityRole="button"
+          accessibilityLabel="ซูมออก"
+          style={styles.mapFloatingBtn}
+        >
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.5}>
+            <Path d="M5 12h14" strokeLinecap="round" />
+          </Svg>
+        </Pressable>
+      </View>
 
       {/* Bottom Floating Controls */}
       <View style={styles.bottomControlsContainer}>

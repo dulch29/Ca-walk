@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,8 +9,22 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {
+  Map as MapView,
+  Camera,
+  CameraRef,
+  Marker,
+} from '@maplibre/maplibre-react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
-import { radius } from '../theme';
+import CatAvatar from '../components/CatAvatar';
+import {
+  AmazonLogo,
+  InthaninLogo,
+  KfcLogo,
+  SevenElevenLogo,
+} from '../components/BrandLogos';
+import { useAppContext } from '../context/AppContext';
+import { radius, space } from '../theme';
 
 type Props = {
   onBack: () => void;
@@ -17,145 +32,336 @@ type Props = {
 };
 
 const STORE_AMAZON_IMG = require('../../Assests/Images/store_amazon.jpg');
+const STORE_7ELEVEN_IMG = require('../../Assests/Images/store_7eleven.jpg');
+const STORE_KFC_IMG = require('../../Assests/Images/store_kfc.jpg');
 
-const FILTERS = ['ใกล้ฉัน', 'ส่วนลด', 'อาหาร & เครื่องดื่ม'];
+const FILTERS = ['ทั้งหมด', 'ใกล้ฉัน', 'ส่วนลด', 'อาหาร & เครื่องดื่ม'];
 
-interface StoreMarker {
+export interface StoreMarker {
   id: string;
   name: string;
+  branch: string;
+  brand: 'amazon' | '7eleven' | 'inthanin' | 'kfc' | 'chula';
   distance: string;
   rating: number;
   hasCoupon: boolean;
-  xPct: number; // 0 to 100
-  yPct: number; // 0 to 100
+  couponText?: string;
+  category: 'all' | 'nearby' | 'coupon' | 'food';
+  coordinates: [number, number]; // [lng, lat]
+  image: any;
 }
 
+// Bangkok Chula - Siam - Bantadthong stores
 const STORE_MARKERS: StoreMarker[] = [
   {
     id: 's1',
     name: 'Cafe Amazon',
+    branch: 'สาขา สยามสแควร์วัน',
+    brand: 'amazon',
     distance: '1.2 km',
     rating: 4.5,
     hasCoupon: true,
-    xPct: 52,
-    yPct: 28,
+    couponText: 'ลด 15.- เครื่องดื่มทุกเมนู',
+    category: 'food',
+    coordinates: [100.5315, 13.7445],
+    image: STORE_AMAZON_IMG,
   },
   {
     id: 's2',
     name: '7-Eleven',
+    branch: 'สาขา บรรทัดทอง ซอย 12',
+    brand: '7eleven',
     distance: '0.8 km',
     rating: 4.2,
     hasCoupon: true,
-    xPct: 46,
-    yPct: 36,
+    couponText: 'คูปองแลกซื้อไส้กรอก 10.-',
+    category: 'nearby',
+    coordinates: [100.5235, 13.7380],
+    image: STORE_7ELEVEN_IMG,
   },
   {
     id: 's3',
     name: 'Inthanin Coffee',
+    branch: 'สาขา สามย่าน มิตรทาวน์',
+    brand: 'inthanin',
     distance: '1.5 km',
     rating: 4.6,
     hasCoupon: false,
-    xPct: 60,
-    yPct: 35,
+    category: 'food',
+    coordinates: [100.5285, 13.7335],
+    image: STORE_AMAZON_IMG,
   },
   {
     id: 's4',
     name: 'KFC',
+    branch: 'สาขา MBK Center ชั้น G',
+    brand: 'kfc',
     distance: '2.1 km',
     rating: 4.0,
     hasCoupon: true,
-    xPct: 58,
-    yPct: 52,
+    couponText: 'ลด 20.- ชุดโดนใจ',
+    category: 'food',
+    coordinates: [100.5303, 13.7460],
+    image: STORE_KFC_IMG,
   },
   {
     id: 's5',
-    name: 'Chula Sweet',
+    name: 'Chula Sweet ขนมหวาน',
+    branch: 'สาขา สวนหลวงสแควร์',
+    brand: 'chula',
     distance: '0.5 km',
     rating: 4.7,
     hasCoupon: false,
-    xPct: 38,
-    yPct: 48,
+    category: 'nearby',
+    coordinates: [100.5265, 13.7350],
+    image: STORE_7ELEVEN_IMG,
   },
 ];
 
+// Bangkok center coordinates [lng, lat]
+const BANGKOK_CENTER: [number, number] = [100.5280, 13.7390];
+
+// CartoDB Voyager High-DPI tiles (warm, crisp outdoor aesthetic matching Ca-walk brand)
+const CARTO_VOYAGER_STYLE = JSON.stringify({
+  version: 8,
+  sources: {
+    'carto-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution: '© CartoDB, © OpenStreetMap contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'carto-tiles-layer',
+      type: 'raster',
+      source: 'carto-tiles',
+      minzoom: 0,
+      maxzoom: 20,
+    },
+  ],
+});
+
+// Standard OpenStreetMap raster tiles (reliable open fallback)
+const OSM_STYLE = JSON.stringify({
+  version: 8,
+  sources: {
+    'osm-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'osm-tiles-layer',
+      type: 'raster',
+      source: 'osm-tiles',
+      minzoom: 0,
+      maxzoom: 19,
+    },
+  ],
+});
+
 export default function MapScreen({ onBack, onOpenStore }: Props) {
+  const { currentLocation } = useAppContext();
   const [filter, setFilter] = useState(FILTERS[0]);
   const [searchText, setSearchText] = useState('');
   const [selectedStore, setSelectedStore] = useState<StoreMarker | null>(STORE_MARKERS[0]);
+  const [mapError, setMapError] = useState(false);
+  const [mapTheme, setMapTheme] = useState<'voyager' | 'osm'>('voyager');
+  const [currentZoom, setCurrentZoom] = useState(15.5);
+  const cameraRef = useRef<CameraRef>(null);
+
+  const userCoords: [number, number] = currentLocation
+    ? [currentLocation.longitude, currentLocation.latitude]
+    : BANGKOK_CENTER;
+
+  // Filter store pins dynamically
+  const filteredStores = STORE_MARKERS.filter((store) => {
+    if (filter === 'ใกล้ฉัน' && store.category !== 'nearby') {
+      return false;
+    }
+    if (filter === 'ส่วนลด' && !store.hasCoupon) {
+      return false;
+    }
+    if (filter === 'อาหาร & เครื่องดื่ม' && store.category !== 'food') {
+      return false;
+    }
+    if (searchText.trim().length > 0) {
+      const q = searchText.toLowerCase();
+      return (
+        store.name.toLowerCase().includes(q) ||
+        store.branch.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const handleSelectStore = (store: StoreMarker) => {
+    setSelectedStore(store);
+    cameraRef.current?.flyTo({
+      center: store.coordinates,
+      zoom: 16.5,
+      duration: 600,
+    });
+  };
+
+  const handleRecenter = () => {
+    cameraRef.current?.flyTo({
+      center: userCoords,
+      zoom: 15.5,
+      duration: 600,
+    });
+    setCurrentZoom(15.5);
+  };
+
+  const handleZoomIn = () => {
+    const nextZoom = Math.min(currentZoom + 1, 19);
+    setCurrentZoom(nextZoom);
+    cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
+  };
+
+  const handleZoomOut = () => {
+    const nextZoom = Math.max(currentZoom - 1, 12);
+    setCurrentZoom(nextZoom);
+    cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
+  };
+
+  const renderBrandLogo = (brand: StoreMarker['brand']) => {
+    if (brand === 'amazon') {
+      return <AmazonLogo size={32} />;
+    }
+    if (brand === '7eleven') {
+      return <SevenElevenLogo size={32} />;
+    }
+    if (brand === 'inthanin') {
+      return <InthaninLogo size={32} />;
+    }
+    if (brand === 'kfc') {
+      return <KfcLogo size={32} />;
+    }
+    return (
+      <View style={styles.chulaPinLogo}>
+        <Text style={styles.chulaPinText}>🍰</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.root}>
-      {/* Map Canvas Background (Illustrated Vector Street Grid matching Ref) */}
+      {/* Real Map Canvas Container */}
       <View style={styles.mapContainer}>
-        <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-          {/* Base ground */}
-          <Rect x="0" y="0" width="100%" height="100%" fill="#F5F2E9" />
+        {!mapError ? (
+          <MapView
+            style={styles.mapView}
+            mapStyle={mapTheme === 'voyager' ? CARTO_VOYAGER_STYLE : OSM_STYLE}
+            logo={false}
+            attribution={false}
+            onDidFailLoadingMap={() => {
+              if (mapTheme === 'voyager') {
+                setMapTheme('osm');
+              } else {
+                setMapError(true);
+              }
+            }}
+          >
+            <Camera
+              ref={cameraRef}
+              initialViewState={{
+                center: userCoords,
+                zoom: 15.5,
+              }}
+              center={userCoords}
+              zoom={currentZoom}
+              minZoom={12}
+            />
 
-          {/* Green Parks / Blocks */}
-          <Rect x="20" y="80" width="120" height="90" rx="8" fill="#EBF2E5" />
-          <Rect x="220" y="60" width="140" height="110" rx="8" fill="#EBF2E5" />
-          <Rect x="15" y="240" width="150" height="130" rx="8" fill="#EBF2E5" />
-          <Rect x="210" y="220" width="160" height="150" rx="8" fill="#EBF2E5" />
-          <Rect x="30" y="440" width="160" height="180" rx="8" fill="#EBF2E5" />
-          <Rect x="220" y="420" width="150" height="200" rx="8" fill="#EBF2E5" />
+            {/* Store Markers with Authentic Brand Badges */}
+            {filteredStores.map((store) => {
+              const isSelected = selectedStore?.id === store.id;
+              return (
+                <Marker
+                  key={store.id}
+                  id={`marker-${store.id}`}
+                  lngLat={store.coordinates}
+                >
+                  <Pressable
+                    onPress={() => handleSelectStore(store)}
+                    style={[
+                      styles.storePinCard,
+                      isSelected && styles.storePinCardSelected,
+                    ]}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={`หมุดร้าน ${store.name}`}
+                  >
+                    {/* Brand Logo in Pin */}
+                    <View style={styles.pinLogoContainer}>
+                      {renderBrandLogo(store.brand)}
+                    </View>
 
-          {/* Roads & Streets */}
-          {/* Main Diagonal Boulevard */}
-          <Line x1="-20" y1="120" x2="420" y2="480" stroke="#FFFFFF" strokeWidth="26" />
-          <Line x1="-20" y1="120" x2="420" y2="480" stroke="#E3DDD1" strokeWidth="1" />
+                    {/* Discount badge if has coupon */}
+                    {store.hasCoupon && (
+                      <View style={styles.pinCouponPill}>
+                        <Text style={styles.pinCouponText}>คูปอง</Text>
+                      </View>
+                    )}
 
-          {/* Secondary Cross Streets */}
-          <Line x1="180" y1="-20" x2="180" y2="800" stroke="#FFFFFF" strokeWidth="20" />
-          <Line x1="70" y1="-20" x2="70" y2="800" stroke="#FFFFFF" strokeWidth="16" />
-          <Line x1="300" y1="-20" x2="300" y2="800" stroke="#FFFFFF" strokeWidth="18" />
+                    {/* Pin pointer triangle */}
+                    <View
+                      style={[
+                        styles.pinNotch,
+                        isSelected && styles.pinNotchSelected,
+                      ]}
+                    />
+                  </Pressable>
+                </Marker>
+              );
+            })}
 
-          <Line x1="-20" y1="200" x2="420" y2="200" stroke="#FFFFFF" strokeWidth="20" />
-          <Line x1="-20" y1="380" x2="420" y2="380" stroke="#FFFFFF" strokeWidth="22" />
-          <Line x1="-20" y1="560" x2="420" y2="560" stroke="#FFFFFF" strokeWidth="18" />
-
-          {/* Secondary small alleys */}
-          <Line x1="120" y1="100" x2="350" y2="100" stroke="#FFFFFF" strokeWidth="10" />
-          <Line x1="40" y1="300" x2="250" y2="300" stroke="#FFFFFF" strokeWidth="10" />
-          <Line x1="120" y1="480" x2="380" y2="480" stroke="#FFFFFF" strokeWidth="12" />
-        </Svg>
-
-        {/* User Pulsing Location Marker (Center Blue Dot with Halo) */}
-        <View style={styles.userLocationWrap}>
-          <View style={styles.userHaloOuter}>
-            <View style={styles.userHaloInner}>
-              <View style={styles.userCenterDot} />
-            </View>
-          </View>
-        </View>
-
-        {/* Store Pins */}
-        {STORE_MARKERS.map((store) => {
-          const isSelected = selectedStore?.id === store.id;
-          return (
-            <Pressable
-              key={store.id}
-              onPress={() => setSelectedStore(store)}
-              style={[
-                styles.pinWrap,
-                { left: `${store.xPct}%`, top: `${store.yPct}%` },
-              ]}
-              hitSlop={10}
-            >
-              <Svg width={32} height={40} viewBox="0 0 32 40">
-                <Path
-                  d="M 16 0 C 7.2 0 0 7.2 0 16 C 0 26 16 40 16 40 C 16 40 32 26 32 16 C 32 7.2 24.8 0 16 0 Z"
-                  fill={isSelected ? '#374730' : '#55684B'}
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                />
-                <Circle cx="16" cy="15" r="5" fill="#FFFFFF" />
-              </Svg>
-            </Pressable>
-          );
-        })}
+            {/* User Cat Marker with Pulsing Radar Ring */}
+            <Marker id="user-cat-marker" lngLat={userCoords}>
+              <View style={styles.userMarkerWrap}>
+                <View style={styles.userSpeechBubble}>
+                  <Text style={styles.userSpeechText}>เมี้ยว~ วันนี้แวะร้านไหนดี?</Text>
+                  <View style={styles.userSpeechTail} />
+                </View>
+                <View style={styles.userCatCard}>
+                  <CatAvatar size={50} mood="sit" />
+                </View>
+                <View style={styles.userRadarHalo}>
+                  <View style={styles.userCenterDot} />
+                </View>
+              </View>
+            </Marker>
+          </MapView>
+        ) : (
+          /* Fallback Illustrated Vector Canvas if offline */
+          <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+            <Rect x="0" y="0" width="100%" height="100%" fill="#F5F2E9" />
+            <Rect x="20" y="80" width="120" height="90" rx="8" fill="#EBF2E5" />
+            <Rect x="220" y="60" width="140" height="110" rx="8" fill="#EBF2E5" />
+            <Rect x="15" y="240" width="150" height="130" rx="8" fill="#EBF2E5" />
+            <Rect x="210" y="220" width="160" height="150" rx="8" fill="#EBF2E5" />
+            <Line x1="-20" y1="120" x2="420" y2="480" stroke="#FFFFFF" strokeWidth="26" />
+            <Line x1="180" y1="-20" x2="180" y2="800" stroke="#FFFFFF" strokeWidth="20" />
+            <Line x1="-20" y1="380" x2="420" y2="380" stroke="#FFFFFF" strokeWidth="22" />
+          </Svg>
+        )}
       </View>
 
-      {/* Floating Top Controls */}
+      {/* Floating Top Controls (Header, Search, Filters) */}
       <View style={styles.topOverlay} pointerEvents="box-none">
         {/* Header Row */}
         <View style={styles.headerRow}>
@@ -167,7 +373,7 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
             style={styles.backButton}
           >
             <Text style={styles.backArrow}>‹</Text>
-            <Text style={styles.headerTitle}>Map</Text>
+            <Text style={styles.headerTitle}>สำรวจแผนที่</Text>
           </Pressable>
         </View>
 
@@ -176,11 +382,16 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="ค้นหาร้านค้า, ประเภท, หรือแบรนด์"
+            placeholder="ค้นหาร้านค้า, คาเฟ่, สาขา"
             placeholderTextColor="#8A8F85"
             value={searchText}
             onChangeText={setSearchText}
           />
+          {searchText.length > 0 && (
+            <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+              <Text style={styles.clearSearchIcon}>✕</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Filter Pills Row */}
@@ -213,11 +424,48 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
               </Pressable>
             );
           })}
-          {/* Funnel / Filter Settings Button */}
-          <Pressable style={styles.filterIconBtn}>
-            <Text style={styles.filterIconEmoji}>🔽</Text>
-          </Pressable>
         </ScrollView>
+      </View>
+
+      {/* Floating Map Utility Buttons (Recenter & Zoom) */}
+      <View style={styles.mapControlsColumn}>
+        <Pressable
+          onPress={handleRecenter}
+          accessibilityRole="button"
+          accessibilityLabel="จัดตำแหน่งกึ่งกลางที่ตัวฉัน"
+          style={styles.mapFloatingBtn}
+        >
+          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.2}>
+            <Circle cx="12" cy="12" r="8" />
+            <Line x1="12" y1="2" x2="12" y2="6" strokeLinecap="round" />
+            <Line x1="12" y1="18" x2="12" y2="22" strokeLinecap="round" />
+            <Line x1="2" y1="12" x2="6" y2="12" strokeLinecap="round" />
+            <Line x1="18" y1="12" x2="22" y2="12" strokeLinecap="round" />
+            <Circle cx="12" cy="12" r="2.5" fill="#38A169" />
+          </Svg>
+        </Pressable>
+
+        <Pressable
+          onPress={handleZoomIn}
+          accessibilityRole="button"
+          accessibilityLabel="ซูมเข้า"
+          style={styles.mapFloatingBtn}
+        >
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.5}>
+            <Path d="M12 5v14M5 12h14" strokeLinecap="round" />
+          </Svg>
+        </Pressable>
+
+        <Pressable
+          onPress={handleZoomOut}
+          accessibilityRole="button"
+          accessibilityLabel="ซูมออก"
+          style={styles.mapFloatingBtn}
+        >
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.5}>
+            <Path d="M5 12h14" strokeLinecap="round" />
+          </Svg>
+        </Pressable>
       </View>
 
       {/* Bottom Floating Store Preview Card */}
@@ -229,7 +477,7 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
               {/* Store Photo / Logo */}
               <View style={styles.previewLogoBox}>
                 <Image
-                  source={STORE_AMAZON_IMG}
+                  source={selectedStore.image}
                   style={styles.previewLogoImage}
                   resizeMode="cover"
                 />
@@ -237,29 +485,37 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
 
               {/* Middle Title & Meta */}
               <View style={styles.previewInfo}>
-                <Text style={styles.previewTitle}>{selectedStore.name}</Text>
+                <Text style={styles.previewTitle} numberOfLines={1}>
+                  {selectedStore.name}
+                </Text>
+                <Text style={styles.previewBranch} numberOfLines={1}>
+                  {selectedStore.branch}
+                </Text>
                 <View style={styles.previewMetaRow}>
                   <Text style={styles.previewDistance}>📍 {selectedStore.distance}</Text>
                   <Text style={styles.previewRating}>⭐ {selectedStore.rating}</Text>
                 </View>
               </View>
 
-              {/* Right Side: Badge & Close */}
-              <View style={styles.previewRight}>
-                <Pressable
-                  onPress={() => setSelectedStore(null)}
-                  hitSlop={8}
-                  style={styles.previewCloseBtn}
-                >
-                  <Text style={styles.previewCloseText}>✕</Text>
-                </Pressable>
-                {selectedStore.hasCoupon && (
-                  <View style={styles.couponBadge}>
-                    <Text style={styles.couponBadgeText}>มีคูปอง</Text>
-                  </View>
-                )}
-              </View>
+              {/* Right Side: Close Button */}
+              <Pressable
+                onPress={() => setSelectedStore(null)}
+                hitSlop={10}
+                style={styles.previewCloseBtn}
+              >
+                <Text style={styles.previewCloseText}>✕</Text>
+              </Pressable>
             </View>
+
+            {/* Coupon Callout if available */}
+            {selectedStore.hasCoupon && selectedStore.couponText && (
+              <View style={styles.previewCouponRow}>
+                <Text style={styles.previewCouponIcon}>🎟️</Text>
+                <Text style={styles.previewCouponText} numberOfLines={1}>
+                  {selectedStore.couponText}
+                </Text>
+              </View>
+            )}
 
             {/* Bottom CTA Button */}
             <Pressable
@@ -268,8 +524,10 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
                 styles.detailBtn,
                 pressed && styles.btnPressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={`ดูรายละเอียดร้าน ${selectedStore.name}`}
             >
-              <Text style={styles.detailBtnText}>ดูรายละเอียด</Text>
+              <Text style={styles.detailBtnText}>ดูร้านค้าและรับส่วนลด</Text>
             </Pressable>
           </View>
         </View>
@@ -291,94 +549,189 @@ const styles = StyleSheet.create({
     bottom: 0,
     overflow: 'hidden',
   },
-  userLocationWrap: {
-    position: 'absolute',
-    left: '48%',
-    top: '42%',
-    marginLeft: -24,
-    marginTop: -24,
+  mapView: {
+    flex: 1,
   },
-  userHaloOuter: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(59, 130, 246, 0.18)',
+
+  // Store Pin on Map
+  storePinCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 3,
+    borderWidth: 2,
+    borderColor: '#ECE4D8',
+    elevation: 5,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+  },
+  storePinCardSelected: {
+    borderColor: '#374B2A',
+    transform: [{ scale: 1.12 }],
+    zIndex: 30,
+  },
+  pinLogoContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userHaloInner: {
+  chulaPinLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chulaPinText: {
+    fontSize: 20,
+  },
+  pinCouponPill: {
+    position: 'absolute',
+    top: -7,
+    right: -7,
+    backgroundColor: '#E53E3E',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  pinCouponText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  pinNotch: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#ECE4D8',
+    marginTop: 2,
+  },
+  pinNotchSelected: {
+    borderTopColor: '#374B2A',
+  },
+
+  // User Marker
+  userMarkerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userSpeechBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E5DFD4',
+    marginBottom: 4,
+    elevation: 3,
+  },
+  userSpeechText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#282C24',
+  },
+  userSpeechTail: {
+    position: 'absolute',
+    bottom: -4,
+    left: '50%',
+    marginLeft: -4,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderTopWidth: 4,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'rgba(255, 255, 255, 0.95)',
+  },
+  userCatCard: {
+    elevation: 4,
+  },
+  userRadarHalo: {
+    position: 'absolute',
+    bottom: 4,
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(59, 130, 246, 0.35)',
+    backgroundColor: 'rgba(59, 130, 246, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: -1,
   },
   userCenterDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#2563EB',
-    borderWidth: 2.5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#3B82F6',
+    borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  pinWrap: {
-    position: 'absolute',
-    marginLeft: -16,
-    marginTop: -40,
-    elevation: 6,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
+
+  // Top Overlay
   topOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 12,
+    top: Platform.OS === 'android' ? 36 : 48,
+    left: space.md,
+    right: space.md,
+    zIndex: 20,
+    gap: space.xs + 2,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 8,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+    elevation: 3,
   },
   backArrow: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#262A22',
-  },
-  headerTitle: {
     fontSize: 22,
     fontWeight: '700',
+    color: '#262A22',
+    marginRight: 6,
+    lineHeight: 22,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
     color: '#262A22',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
     borderRadius: radius.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: space.md,
+    paddingVertical: Platform.OS === 'android' ? 6 : 9,
     borderWidth: 1,
-    borderColor: '#EFE9DE',
-    elevation: 4,
+    borderColor: '#ECE4D8',
+    elevation: 3,
     shadowColor: '#262A22',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    gap: 10,
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
   searchIcon: {
-    fontSize: 16,
+    fontSize: 14,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
@@ -386,86 +739,97 @@ const styles = StyleSheet.create({
     color: '#262A22',
     padding: 0,
   },
+  clearSearchIcon: {
+    fontSize: 14,
+    color: '#8A8F85',
+    paddingHorizontal: 4,
+  },
   filtersRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 6,
     gap: 8,
+    paddingVertical: 2,
   },
   filterPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: radius.pill,
-    elevation: 2,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    borderWidth: 1,
   },
   filterPillActive: {
-    backgroundColor: '#55684B',
+    backgroundColor: '#374B2A',
+    borderColor: '#374B2A',
   },
   filterPillInactive: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderColor: '#ECE4D8',
   },
   filterText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   filterTextActive: {
     color: '#FFFFFF',
   },
   filterTextInactive: {
-    color: '#70756B',
+    color: '#4B553D',
   },
-  filterIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#ECE4D8',
+
+  // Map Floating Utility Controls (Re-center, Zoom)
+  mapControlsColumn: {
+    position: 'absolute',
+    right: space.lg,
+    bottom: Platform.OS === 'android' ? 190 : 205,
+    zIndex: 22,
+    gap: 8,
+  },
+  mapFloatingBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ECE4D8',
+    elevation: 4,
+    shadowColor: '#262A22',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
   },
-  filterIconEmoji: {
-    fontSize: 12,
-  },
+
+  // Bottom Floating Store Preview Card
   bottomOverlay: {
     position: 'absolute',
-    bottom: 24,
-    left: 20,
-    right: 20,
+    left: space.md,
+    right: space.md,
+    bottom: Platform.OS === 'android' ? 24 : 36,
+    zIndex: 25,
   },
   previewCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 22,
-    padding: 16,
+    padding: space.md,
     borderWidth: 1,
-    borderColor: '#EFE9DE',
-    elevation: 10,
+    borderColor: '#ECE4D8',
+    elevation: 6,
     shadowColor: '#262A22',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    gap: 14,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    gap: 10,
   },
   previewTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   previewLogoBox: {
     width: 58,
     height: 58,
     borderRadius: 14,
     overflow: 'hidden',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#ECE4D8',
+    backgroundColor: '#F3EFE6',
   },
   previewLogoImage: {
     width: '100%',
@@ -473,68 +837,80 @@ const styles = StyleSheet.create({
   },
   previewInfo: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
   previewTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#262A22',
-    letterSpacing: -0.2,
+  },
+  previewBranch: {
+    fontSize: 12,
+    color: '#656D5F',
+    fontWeight: '600',
   },
   previewMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    marginTop: 2,
   },
   previewDistance: {
     fontSize: 12,
-    fontWeight: '500',
-    color: '#55684B',
+    fontWeight: '700',
+    color: '#374B2A',
   },
   previewRating: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#C78923',
-  },
-  previewRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: 54,
+    fontWeight: '700',
+    color: '#D97706',
   },
   previewCloseBtn: {
-    padding: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3EFE6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   previewCloseText: {
+    fontSize: 13,
+    color: '#656D5F',
+    fontWeight: '700',
+  },
+  previewCouponRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  previewCouponIcon: {
     fontSize: 14,
-    color: '#A0A59B',
-    fontWeight: '600',
   },
-  couponBadge: {
-    backgroundColor: '#E04F4F',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  couponBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
+  previewCouponText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
   },
   detailBtn: {
-    backgroundColor: '#55684B',
-    height: 46,
-    borderRadius: 23,
+    backgroundColor: '#374B2A',
+    borderRadius: radius.pill,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnPressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.92,
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
   },
   detailBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
