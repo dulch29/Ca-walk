@@ -121,42 +121,16 @@ const STORE_MARKERS: StoreMarker[] = [
 // Bangkok center coordinates [lng, lat]
 const BANGKOK_CENTER: [number, number] = [100.5280, 13.7390];
 
-// CartoDB Voyager High-DPI tiles (warm, crisp outdoor aesthetic matching Ca-walk brand)
-const CARTO_VOYAGER_STYLE = JSON.stringify({
-  version: 8,
-  sources: {
-    'carto-tiles': {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 256,
-      attribution: '© CartoDB, © OpenStreetMap contributors',
-    },
-  },
-  layers: [
-    {
-      id: 'carto-tiles-layer',
-      type: 'raster',
-      source: 'carto-tiles',
-      minzoom: 0,
-      maxzoom: 20,
-    },
-  ],
-});
-
-// Standard OpenStreetMap raster tiles (reliable open fallback)
+// OpenStreetMap raster tiles (100% free & open, NO API key required)
 const OSM_STYLE = JSON.stringify({
   version: 8,
   sources: {
     'osm-tiles': {
       type: 'raster',
       tiles: [
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
         'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
       ],
       tileSize: 256,
       attribution: '© OpenStreetMap contributors',
@@ -179,7 +153,6 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
   const [searchText, setSearchText] = useState('');
   const [selectedStore, setSelectedStore] = useState<StoreMarker | null>(STORE_MARKERS[0]);
   const [mapError, setMapError] = useState(false);
-  const [mapTheme, setMapTheme] = useState<'voyager' | 'osm'>('voyager');
   const [currentZoom, setCurrentZoom] = useState(15.5);
   const cameraRef = useRef<CameraRef>(null);
 
@@ -265,16 +238,10 @@ export default function MapScreen({ onBack, onOpenStore }: Props) {
         {!mapError ? (
           <MapView
             style={styles.mapView}
-            mapStyle={mapTheme === 'voyager' ? CARTO_VOYAGER_STYLE : OSM_STYLE}
+            mapStyle={OSM_STYLE}
             logo={false}
             attribution={false}
-            onDidFailLoadingMap={() => {
-              if (mapTheme === 'voyager') {
-                setMapTheme('osm');
-              } else {
-                setMapError(true);
-              }
-            }}
+            onDidFailLoadingMap={() => setMapError(true)}
           >
             <Camera
               ref={cameraRef}
