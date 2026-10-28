@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -18,6 +18,9 @@ import Svg, { Circle, Line, Path } from 'react-native-svg';
 import CatAvatar from '../components/CatAvatar';
 import { useAppContext } from '../context/AppContext';
 import { styles } from './RecordScreen.styles';
+import { OSM_CONFIG, OSM_MAP_STYLE } from '../services/osmMapService';
+import { haversineDistanceMeters } from '../services/locationUtils';
+import { formatDistance } from '../services/osmLocationService';
 
 const MAP_FALLBACK_BG = require('../../Assests/Images/record_map.jpg');
 
@@ -27,6 +30,8 @@ export type RunSummary = {
   seconds: number;
   km: number;
   steps: number;
+  destinationName?: string;
+  photos?: string[];
 };
 
 type Phase = 'idle' | 'pick' | 'ready' | 'recording' | 'paused';
@@ -43,12 +48,16 @@ export const SPORT_ICON: Record<Sport, string> = { walk: '🚶', run: '🏃' };
 const pad = (n: number) => String(n).padStart(2, '0');
 export const fmtTime = (s: number) =>
   `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
-export const fmtPace = (seconds: number, km: number) => {
-  if (km <= 0) {
-    return '0:00';
+
+export const fmtPace = (seconds: number, km: number): string => {
+  if (km <= 0.005 || seconds <= 0) {
+    return '--';
   }
-  const p = Math.round(seconds / km);
-  return `${Math.floor(p / 60)}:${pad(p % 60)}`;
+  const minPerKm = seconds / 60 / km;
+  if (!Number.isFinite(minPerKm) || minPerKm <= 0 || minPerKm > 60) {
+    return '--';
+  }
+  return minPerKm.toFixed(2);
 };
 
 const BUBBLE: Record<Phase, string> = {
@@ -59,126 +68,228 @@ const BUBBLE: Record<Phase, string> = {
   paused: 'พักก่อนนะ แล้วค่อยไปต่อกัน!',
 };
 
-// Bangkok Lumpini / Bantadthong center coordinates [lng, lat]
-const BANGKOK_COORDS: [number, number] = [100.5417, 13.7314];
+// Default Bangkok coordinates if GPS is not yet acquired (used strictly for initial camera positioning)
+const DEFAULT_MAP_CENTER: [number, number] = [100.5417, 13.7314];
 
-// OpenStreetMap raster tiles (100% free & open, accurate GPS roads, NO API key required)
-const OSM_STYLE = JSON.stringify({
-  version: 8,
-  sources: {
-    'osm-tiles': {
-      type: 'raster',
-      tiles: [
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [
-    {
-      id: 'osm-tiles-layer',
-      type: 'raster',
-      source: 'osm-tiles',
-      minzoom: 0,
-      maxzoom: 19,
-    },
-  ],
-});
-
-// High-contrast double-layer route polyline
-const ROUTE_CASING_STYLE = {
+// High-contrast actual GPS recorded track styles
+const ACTUAL_TRACK_CASING_STYLE = {
   lineColor: '#17361A',
   lineWidth: 8,
   lineCap: 'round',
   lineJoin: 'round',
 } as const;
 
-const ROUTE_LINE_STYLE = {
+const ACTUAL_TRACK_LINE_STYLE = {
   lineColor: '#38A169',
   lineWidth: 5,
   lineCap: 'round',
   lineJoin: 'round',
 } as const;
 
+const ROUTE_PREVIEW_CASING_STYLE = {
+  lineColor: '#1E3A8A',
+  lineWidth: 6,
+  lineCap: 'round',
+  lineJoin: 'round',
+} as const;
+
+const ROUTE_PREVIEW_LINE_STYLE = {
+  lineColor: '#3B82F6',
+  lineWidth: 4,
+  lineDasharray: [2, 1.5] as number[],
+  lineCap: 'round' as const,
+  lineJoin: 'round' as const,
+};
+
 export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   const {
     activeSession,
     startRunSession,
+    pauseRunSession,
+    resumeRunSession,
     endRunSession,
     speedFraudActive,
     trackingError,
     currentLocation,
-    addMockDistance,
+    selectedDestination,
+    requestLocationPermission,
   } = useAppContext();
 
-  const [phase, setPhase] = useState<Phase>(() =>
-    activeSession ? 'recording' : 'idle',
-  );
+  const [localPhase, setLocalPhase] = useState<Phase>('ready');
   const [sport, setSport] = useState<Sport>('walk');
   const [mapError, setMapError] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(16);
   const cameraRef = useRef<CameraRef>(null);
+  const hasCenteredInitialFix = useRef(false);
 
-  const seconds =
-    activeSession?.durationSeconds ??
-    (phase === 'recording' || phase === 'paused' ? 1938 : 0);
-  const km =
-    activeSession?.distanceKm ??
-    (phase === 'recording' || phase === 'paused' ? 3.24 : 0);
-  const steps =
-    activeSession?.steps ??
-    (phase === 'recording' || phase === 'paused' ? 4892 : 0);
+  // Prompt user for location permission on mount to observe and display user position
+  useEffect(() => {
+    requestLocationPermission().catch(() => {});
+  }, [requestLocationPermission]);
+
+  // Active session status overrides local phase
+  const phase: Phase = activeSession
+    ? activeSession.status === 'paused'
+      ? 'paused'
+      : 'recording'
+    : localPhase;
+
+  const active = phase === 'recording' || phase === 'paused';
+
+  // Genuine statistics derived strictly from session data (NO mock fallback)
+  const seconds = activeSession?.durationSeconds ?? 0;
+  const km = activeSession?.distanceKm ?? 0;
+  const steps = activeSession?.steps ?? 0;
   const pace =
     activeSession?.currentPace && activeSession.currentPace !== '-- /km'
       ? activeSession.currentPace
-      : km > 0
+      : km > 0.005 && seconds > 0
       ? `${fmtPace(seconds, km)} /km`
-      : '6:42 /km';
-  const active = phase === 'recording' || phase === 'paused';
+      : '-- /km';
 
-  // Current GPS point [lng, lat]
-  const currentLngLat: [number, number] = currentLocation
-    ? [currentLocation.longitude, currentLocation.latitude]
-    : BANGKOK_COORDS;
+  const hasGpsFix = currentLocation !== null;
+  const currentLngLat: [number, number] | null = useMemo(
+    () =>
+      currentLocation
+        ? [currentLocation.longitude, currentLocation.latitude]
+        : null,
+    [currentLocation],
+  );
 
-  // Real route coordinate history for polyline trail
-  const [routeCoords, setRouteCoords] = useState<Array<[number, number]>>([
-    [BANGKOK_COORDS[0] - 0.003, BANGKOK_COORDS[1] - 0.004],
-    [BANGKOK_COORDS[0] - 0.0015, BANGKOK_COORDS[1] - 0.002],
-    BANGKOK_COORDS,
-  ]);
-
-  // Append new GPS points as user moves
+  // Center camera when initial GPS fix is obtained
   useEffect(() => {
-    if (currentLocation && active) {
-      setRouteCoords(prev => {
-        const last = prev[prev.length - 1];
-        if (
-          !last ||
-          last[0] !== currentLocation.longitude ||
-          last[1] !== currentLocation.latitude
-        ) {
-          return [...prev, [currentLocation.longitude, currentLocation.latitude]];
-        }
-        return prev;
+    if (currentLngLat && !hasCenteredInitialFix.current) {
+      hasCenteredInitialFix.current = true;
+      cameraRef.current?.flyTo({
+        center: currentLngLat,
+        zoom: 16,
+        duration: 800,
+      });
+      setCurrentZoom(16);
+    }
+  }, [currentLngLat]);
+
+  // Actual recorded GPS track coordinates from session
+  const actualTrackCoords = activeSession?.trackCoordinates ?? [];
+
+  // Active destination (from session or selected before start)
+  const activeDestination =
+    activeSession?.destination ?? selectedDestination ?? null;
+
+  // Track waypoint progress along the destination route
+  const [passedWaypointIndex, setPassedWaypointIndex] = useState(0);
+  const [isDestinationReached, setIsDestinationReached] = useState(false);
+  const [isAutoFollowing, setIsAutoFollowing] = useState(true);
+
+  // Auto-follow user camera during active recording
+  useEffect(() => {
+    if (phase === 'recording' && currentLngLat && isAutoFollowing) {
+      cameraRef.current?.flyTo({
+        center: currentLngLat,
+        zoom: currentZoom,
+        duration: 500,
       });
     }
-  }, [currentLocation, active]);
+  }, [currentLngLat, phase, isAutoFollowing, currentZoom]);
+
+  // Dynamic route trimming: remove waypoints already traversed behind the user
+  const { remainingRouteCoords, distanceToDestinationMeters } = useMemo(() => {
+    if (
+      !activeDestination?.routeCoordinates ||
+      activeDestination.routeCoordinates.length < 2
+    ) {
+      return { remainingRouteCoords: [], distanceToDestinationMeters: null };
+    }
+
+    const fullRoute = activeDestination.routeCoordinates;
+    const destCoord = activeDestination.coordinates;
+
+    if (!currentLngLat) {
+      return {
+        remainingRouteCoords: fullRoute,
+        distanceToDestinationMeters: null,
+      };
+    }
+
+    const distToDest = Math.round(
+      haversineDistanceMeters(
+        { latitude: currentLngLat[1], longitude: currentLngLat[0] },
+        { latitude: destCoord[1], longitude: destCoord[0] },
+      ),
+    );
+
+    if (distToDest <= 25) {
+      if (!isDestinationReached) {
+        setIsDestinationReached(true);
+      }
+      return {
+        remainingRouteCoords: [],
+        distanceToDestinationMeters: distToDest,
+      };
+    }
+
+    // Look ahead from passedWaypointIndex to find closest forward waypoint along the route
+    let closestIndex = passedWaypointIndex;
+    let minDistance = Infinity;
+    const lookaheadLimit = Math.min(
+      passedWaypointIndex + 20,
+      fullRoute.length - 1,
+    );
+
+    for (let i = passedWaypointIndex; i <= lookaheadLimit; i++) {
+      const wp = fullRoute[i];
+      const d = haversineDistanceMeters(
+        { latitude: currentLngLat[1], longitude: currentLngLat[0] },
+        { latitude: wp[1], longitude: wp[0] },
+      );
+      if (d < minDistance) {
+        minDistance = d;
+        closestIndex = i;
+      }
+    }
+
+    // If within 35 meters of this forward waypoint, advance passed index
+    if (minDistance <= 35 && closestIndex > passedWaypointIndex) {
+      setPassedWaypointIndex(closestIndex);
+    }
+
+    if (closestIndex >= fullRoute.length - 1) {
+      return {
+        remainingRouteCoords: [],
+        distanceToDestinationMeters: distToDest,
+      };
+    }
+
+    // Connect from current user location forward to remaining waypoints
+    const remaining: Array<[number, number]> = [
+      currentLngLat,
+      ...fullRoute.slice(closestIndex + 1),
+    ];
+
+    return {
+      remainingRouteCoords: remaining,
+      distanceToDestinationMeters: distToDest,
+    };
+  }, [
+    activeDestination,
+    currentLngLat,
+    isDestinationReached,
+    passedWaypointIndex,
+  ]);
 
   const chooseSport = (s: Sport) => {
     setSport(s);
-    setPhase('ready');
+    setLocalPhase('ready');
   };
 
   const handleStart = async () => {
     try {
       if (!activeSession) {
-        await startRunSession();
+        setPassedWaypointIndex(0);
+        setIsDestinationReached(false);
+        setIsAutoFollowing(true);
+        await startRunSession(activeDestination ?? undefined);
       }
-      setPhase('recording');
     } catch (e) {
       Alert.alert(
         'ขออภัย',
@@ -188,20 +299,29 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   };
 
   const handlePause = () => {
-    setPhase('paused');
+    pauseRunSession();
   };
 
   const handleResume = () => {
-    setPhase('recording');
+    resumeRunSession();
   };
 
   const handleRecenter = () => {
-    cameraRef.current?.flyTo({
-      center: currentLngLat,
-      zoom: 16,
-      duration: 600,
-    });
-    setCurrentZoom(16);
+    setIsAutoFollowing(true);
+    if (currentLngLat) {
+      cameraRef.current?.flyTo({
+        center: currentLngLat,
+        zoom: 16,
+        duration: 600,
+      });
+      setCurrentZoom(16);
+    } else {
+      cameraRef.current?.flyTo({
+        center: DEFAULT_MAP_CENTER,
+        zoom: 14,
+        duration: 600,
+      });
+    }
   };
 
   const handleZoomIn = () => {
@@ -211,7 +331,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   };
 
   const handleZoomOut = () => {
-    const nextZoom = Math.max(currentZoom - 1, 12);
+    const nextZoom = Math.max(currentZoom - 1, 10);
     setCurrentZoom(nextZoom);
     cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
   };
@@ -221,94 +341,137 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
     const finalSeconds = completed?.durationSeconds ?? seconds;
     const finalKm = completed?.distanceKm ?? km;
     const finalSteps = completed?.steps ?? steps;
+    const destName = completed?.destinationName ?? activeDestination?.name;
+    const photos = completed?.photos ?? activeSession?.photos ?? [];
 
     onFinish({
       sport,
       seconds: finalSeconds,
       km: finalKm,
       steps: finalSteps,
+      destinationName: destName,
+      photos,
     });
-    setPhase('ready');
+    setLocalPhase('ready');
   };
 
   return (
     <View style={styles.root}>
-      {/* Real Map Container */}
+      {/* Real OSM Map Container */}
       <View style={styles.mapContainer}>
         {!mapError ? (
           <MapView
             style={styles.mapView}
-            mapStyle={OSM_STYLE}
+            mapStyle={OSM_MAP_STYLE}
             logo={false}
             attribution={false}
+            onTouchStart={() => setIsAutoFollowing(false)}
             onDidFailLoadingMap={() => setMapError(true)}
           >
             <Camera
               ref={cameraRef}
               initialViewState={{
-                center: currentLngLat,
-                zoom: 16,
+                center: currentLngLat ?? DEFAULT_MAP_CENTER,
+                zoom: hasGpsFix ? 16 : 14,
               }}
-              center={currentLngLat}
+              center={currentLngLat ?? DEFAULT_MAP_CENTER}
               zoom={currentZoom}
-              minZoom={12}
+              minZoom={OSM_CONFIG.minZoom}
+              maxZoom={OSM_CONFIG.maxZoom}
             />
 
-            {/* Real GPS Route Polyline Trail on Actual Streets with high-contrast casing */}
-            {active && routeCoords.length > 1 && (
+            {/* Destination Walking Route Preview (Dynamically trimmed as user moves) */}
+            {remainingRouteCoords.length > 1 && (
               <GeoJSONSource
-                id="live-route-source"
+                id="destination-route-preview-source"
                 data={{
                   type: 'Feature',
                   properties: {},
                   geometry: {
                     type: 'LineString',
-                    coordinates: routeCoords,
+                    coordinates: remainingRouteCoords,
+                  },
+                }}
+              >
+                <Layer
+                  id="preview-casing"
+                  type="line"
+                  style={ROUTE_PREVIEW_CASING_STYLE}
+                />
+                <Layer
+                  id="preview-line"
+                  type="line"
+                  style={ROUTE_PREVIEW_LINE_STYLE}
+                />
+              </GeoJSONSource>
+            )}
+
+            {/* Destination Marker on Map */}
+            {activeDestination && (
+              <Marker
+                id="destination-pin"
+                lngLat={activeDestination.coordinates}
+              >
+                <View style={styles.destPinWrap}>
+                  <View style={styles.destPinBadge}>
+                    <Text style={styles.destPinText} numberOfLines={1}>
+                      🏁 {activeDestination.name}
+                    </Text>
+                  </View>
+                </View>
+              </Marker>
+            )}
+
+            {/* Actual Recorded GPS Track from Sensors/Location */}
+            {active && actualTrackCoords.length > 1 && (
+              <GeoJSONSource
+                id="live-actual-route-source"
+                data={{
+                  type: 'Feature',
+                  properties: {},
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: actualTrackCoords,
                   },
                 }}
               >
                 <Layer
                   id="live-route-casing"
                   type="line"
-                  style={ROUTE_CASING_STYLE}
+                  style={ACTUAL_TRACK_CASING_STYLE}
                 />
                 <Layer
                   id="live-route-line"
                   type="line"
-                  style={ROUTE_LINE_STYLE}
+                  style={ACTUAL_TRACK_LINE_STYLE}
                 />
               </GeoJSONSource>
             )}
 
-            {/* Start point badge */}
-            {active && routeCoords.length > 0 && (
-              <Marker id="route-start-pin" lngLat={routeCoords[0]}>
+            {/* Start point badge for actual track */}
+            {active && actualTrackCoords.length > 0 && (
+              <Marker id="route-start-pin" lngLat={actualTrackCoords[0]}>
                 <View style={styles.startPinWrap}>
                   <View style={styles.startPinBadge}>
-                    <Text style={styles.startPinText}>🏁 เริ่มต้น</Text>
+                    <Text style={styles.startPinText}>🚩 เริ่มต้น</Text>
                   </View>
                 </View>
               </Marker>
             )}
 
-            {/* User GPS Cat Marker replacing standard blue dot */}
-            <Marker id="user-cat-marker" lngLat={currentLngLat}>
-              <View style={styles.catMarkerWrap}>
-                {/* Speech Bubble */}
-                <View style={styles.speechBubble}>
-                  <Text style={styles.speechText}>
-                    {speedFraudActive ? 'เมี้ยว! วิ่งเร็วเกินไปแล้ว~' : BUBBLE[phase]}
-                  </Text>
-                  <View style={styles.speechTail} />
-                </View>
+            {/* User GPS Cat Marker - Rendered ONLY when GPS fix is real */}
+            {hasGpsFix && currentLngLat && (
+              <Marker id="user-cat-marker" lngLat={currentLngLat}>
+                <View style={styles.catMarkerWrap}>
+                  <View style={styles.speechBubble}>
+                    <Text style={styles.speechText}>
+                      {speedFraudActive
+                        ? 'เมี้ยว! เร็วเกิน Pace 2 แล้ว~'
+                        : BUBBLE[phase]}
+                    </Text>
+                    <View style={styles.speechTail} />
+                  </View>
 
-                {/* Animated Cat Avatar */}
-                <Pressable
-                  onPress={() => active && addMockDistance(0.25)}
-                  accessibilityRole="button"
-                  accessibilityLabel="แตะตัวแมวเพื่อเพิ่มระยะทดสอบ"
-                  hitSlop={10}
-                >
                   <CatAvatar
                     size={84}
                     mood={
@@ -321,25 +484,45 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                         : 'sit'
                     }
                   />
-                </Pressable>
 
-                {/* Pulsing GPS Halo & Blue Dot */}
-                <View style={styles.gpsHalo}>
-                  <View style={styles.gpsInnerDot} />
+                  <View style={styles.gpsHalo}>
+                    <View style={styles.gpsInnerDot} />
+                  </View>
                 </View>
-              </View>
-            </Marker>
+              </Marker>
+            )}
           </MapView>
         ) : (
-          /* Offline Fallback styled Google Maps image */
           <Image
             source={MAP_FALLBACK_BG}
             style={styles.mapBgImage}
             resizeMode="cover"
-            accessibilityLabel="แผนที่กรุงเทพ"
+            accessibilityLabel="แผนที่ออฟไลน์"
           />
         )}
       </View>
+
+      {/* Visible OSM Attribution Pill (Required by Policy) */}
+      <View style={styles.osmAttributionPill} pointerEvents="none">
+        <Text style={styles.osmAttributionText}>{OSM_CONFIG.attribution}</Text>
+      </View>
+
+      {/* Waiting for GPS pill when no location fix - allows tapping to request permission */}
+      {!hasGpsFix && (
+        <Pressable
+          onPress={() => {
+            requestLocationPermission().catch(() => {});
+          }}
+          style={styles.gpsWaitingPill}
+          accessibilityRole="button"
+          accessibilityLabel="ขออนุญาตจับตำแหน่งผู้ใช้"
+          hitSlop={8}
+        >
+          <Text style={styles.gpsWaitingText}>
+            📍 ขออนุญาตจับตำแหน่งผู้ใช้ (แตะเพื่ออนุญาต)
+          </Text>
+        </Pressable>
+      )}
 
       {/* Top Header Floating Pill */}
       <View style={styles.header}>
@@ -351,15 +534,26 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           hitSlop={10}
         >
           <View style={styles.backBtnCircle}>
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.8}>
-              <Path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            <Svg
+              width={20}
+              height={20}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#262A22"
+              strokeWidth={2.8}
+            >
+              <Path
+                d="M15 19l-7-7 7-7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </Svg>
           </View>
           {!active && <Text style={styles.headerTitle}>ออกเดินทาง</Text>}
         </Pressable>
       </View>
 
-      {/* Top Floating Timer Pill (Screens 4 & 5) */}
+      {/* Top Floating Timer Pill */}
       {active && (
         <View style={styles.topFloatingArea}>
           <View style={styles.timerPill}>
@@ -383,7 +577,9 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
       {active && (
         <View style={styles.gpsPill}>
           <View style={styles.gpsDot} />
-          <Text style={styles.gpsText}>GPS ดีมาก</Text>
+          <Text style={styles.gpsText}>
+            {hasGpsFix ? 'GPS ดีมาก' : 'ค้นหา GPS...'}
+          </Text>
         </View>
       )}
 
@@ -391,7 +587,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
       {speedFraudActive && (
         <View style={styles.bannerCard}>
           <Text style={styles.bannerText}>
-            🚨 ความเร็วเกิน 18 km/h! น้องแมววิ่งตามไม่ทัน
+            🚨 ความเร็วเร็วกว่า Pace 2 (&gt;30 km/h)! กำลังนั่งยานพาหนะหรือไม่?
           </Text>
         </View>
       )}
@@ -402,7 +598,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
         </View>
       )}
 
-      {/* Floating 3-Column Stats Card (Screens 4 & 5) */}
+      {/* Floating 3-Column Stats Card */}
       {active && (
         <View style={styles.statsCard}>
           <View style={styles.statsRow}>
@@ -420,7 +616,17 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             </View>
           </View>
           <View style={styles.locationSubtitle}>
-            <Text style={styles.locationText}>📍 Bangkok, Thailand</Text>
+            <Text style={styles.locationText} numberOfLines={1}>
+              {activeDestination
+                ? isDestinationReached
+                  ? `🎉 ถึง ${activeDestination.name} แล้ว!`
+                  : `🏁 ปลายทาง: ${activeDestination.name}${
+                      distanceToDestinationMeters !== null
+                        ? ` (เหลือ ${formatDistance(distanceToDestinationMeters)})`
+                        : ''
+                    }`
+                : '📍 กำลังบันทึกกิจกรรม'}
+            </Text>
           </View>
         </View>
       )}
@@ -430,10 +636,17 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
         <Pressable
           onPress={handleRecenter}
           accessibilityRole="button"
-          accessibilityLabel="จัดตำแหน่งกึ่งกลางที่ตัวแมว"
+          accessibilityLabel="จัดตำแหน่งกึ่งกลาง"
           style={styles.mapFloatingBtn}
         >
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.2}>
+          <Svg
+            width={20}
+            height={20}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#262A22"
+            strokeWidth={2.2}
+          >
             <Circle cx="12" cy="12" r="8" />
             <Line x1="12" y1="2" x2="12" y2="6" strokeLinecap="round" />
             <Line x1="12" y1="18" x2="12" y2="22" strokeLinecap="round" />
@@ -449,7 +662,14 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           accessibilityLabel="ซูมเข้า"
           style={styles.mapFloatingBtn}
         >
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.5}>
+          <Svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#262A22"
+            strokeWidth={2.5}
+          >
             <Path d="M12 5v14M5 12h14" strokeLinecap="round" />
           </Svg>
         </Pressable>
@@ -460,7 +680,14 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           accessibilityLabel="ซูมออก"
           style={styles.mapFloatingBtn}
         >
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#262A22" strokeWidth={2.5}>
+          <Svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#262A22"
+            strokeWidth={2.5}
+          >
             <Path d="M5 12h14" strokeLinecap="round" />
           </Svg>
         </Pressable>
@@ -468,35 +695,50 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
 
       {/* Bottom Floating Controls */}
       <View style={styles.bottomControlsContainer}>
-        {/* Phase: Idle / Ready (Screens 1 & 3) */}
+        {/* Phase: Idle / Ready */}
         {!active && phase !== 'pick' && (
           <View style={styles.readyControlsRow}>
             {/* Left: Sport Selector Button */}
             <View style={styles.controlBtnCol}>
               <Pressable
-                onPress={() => setPhase('pick')}
+                onPress={() => setLocalPhase('pick')}
                 accessibilityRole="button"
                 accessibilityLabel="เลือกประเภทกีฬา"
                 style={styles.circleBtnSoft}
               >
-                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#374B2A" strokeWidth={2}>
+                <Svg
+                  width={24}
+                  height={24}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#374B2A"
+                  strokeWidth={2}
+                >
                   {sport === 'walk' ? (
                     <>
                       <Circle cx="12" cy="4" r="2" fill="#374B2A" stroke="none" />
-                      <Path d="M10 22v-6l-2-2v-4l4-2 3 3v5" strokeLinecap="round" strokeLinejoin="round" />
+                      <Path
+                        d="M10 22v-6l-2-2v-4l4-2 3 3v5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                       <Path d="M14 14l2 8" strokeLinecap="round" />
                     </>
                   ) : (
                     <>
                       <Circle cx="15" cy="4" r="2" fill="#374B2A" stroke="none" />
-                      <Path d="M9 20l3-5-2-3 4-3 3 2v4" strokeLinecap="round" strokeLinejoin="round" />
+                      <Path
+                        d="M9 20l3-5-2-3 4-3 3 2v4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                       <Path d="M6 14l3-2" strokeLinecap="round" />
                     </>
                   )}
                 </Svg>
               </Pressable>
               <Text style={styles.controlBtnLabel}>
-                {phase === 'idle' ? 'เลือกกีฬา' : SPORT_LABEL[sport]}
+                {SPORT_LABEL[sport]}
               </Text>
             </View>
 
@@ -508,7 +750,13 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 accessibilityLabel="เริ่มออกเดินทาง"
                 style={styles.circleBtnMain}
               >
-                <Svg width={30} height={30} viewBox="0 0 24 24" fill="#FFFFFF" style={styles.circleBtnMainPlay}>
+                <Svg
+                  width={30}
+                  height={30}
+                  viewBox="0 0 24 24"
+                  fill="#FFFFFF"
+                  style={styles.circleBtnMainPlay}
+                >
                   <Path d="M8 5v14l11-7z" />
                 </Svg>
               </Pressable>
@@ -523,7 +771,14 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 accessibilityLabel="ถ่ายรูปกิจกรรม"
                 style={styles.circleBtnSoft}
               >
-                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#374B2A" strokeWidth={2}>
+                <Svg
+                  width={24}
+                  height={24}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#374B2A"
+                  strokeWidth={2}
+                >
                   <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                   <Circle cx="12" cy="13" r="4" />
                 </Svg>
@@ -533,7 +788,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           </View>
         )}
 
-        {/* Phase: Sport Picker Opened (Screen 2) */}
+        {/* Phase: Sport Picker Opened */}
         {!active && phase === 'pick' && (
           <View style={styles.sportPickerRow}>
             <Pressable
@@ -578,7 +833,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           </View>
         )}
 
-        {/* Phase: Recording Active (Screen 4) */}
+        {/* Phase: Recording Active */}
         {phase === 'recording' && (
           <View style={styles.recordingControlsRow}>
             <Pressable
@@ -600,7 +855,14 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 accessibilityLabel="ถ่ายรูปกิจกรรม"
                 style={styles.circleBtnSoft}
               >
-                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#374B2A" strokeWidth={2}>
+                <Svg
+                  width={24}
+                  height={24}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#374B2A"
+                  strokeWidth={2}
+                >
                   <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                   <Circle cx="12" cy="13" r="4" />
                 </Svg>
@@ -610,7 +872,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           </View>
         )}
 
-        {/* Phase: Paused (Screen 5) */}
+        {/* Phase: Paused */}
         {phase === 'paused' && (
           <View style={styles.pausedControlsRow}>
             {/* Left: Finish (Stop) */}
@@ -636,7 +898,13 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 accessibilityLabel="ไปต่อ"
                 style={styles.resumeCircleBtn}
               >
-                <Svg width={30} height={30} viewBox="0 0 24 24" fill="#FFFFFF" style={styles.circleBtnMainPlay}>
+                <Svg
+                  width={30}
+                  height={30}
+                  viewBox="0 0 24 24"
+                  fill="#FFFFFF"
+                  style={styles.circleBtnMainPlay}
+                >
                   <Path d="M8 5v14l11-7z" />
                 </Svg>
               </Pressable>
@@ -651,7 +919,14 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 accessibilityLabel="ถ่ายรูปกิจกรรม"
                 style={styles.circleBtnSoft}
               >
-                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#374B2A" strokeWidth={2}>
+                <Svg
+                  width={24}
+                  height={24}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#374B2A"
+                  strokeWidth={2}
+                >
                   <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                   <Circle cx="12" cy="13" r="4" />
                 </Svg>

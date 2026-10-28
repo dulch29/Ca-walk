@@ -1,112 +1,140 @@
-# Ca-Walk: สถานะและแผนส่งต่องาน
+# Ca-Walk: แผนส่งต่องานแผนที่และบันทึกกิจกรรม
 
-อัปเดต: 25 ตุลาคม 2026  
-เป้าหมาย: ทำ Android prototype ให้แสดงแผนที่จริง บันทึกก้าวและระยะทางจากเครื่อง และแลก/ใช้คูปองจำลองได้ในแอป
+อัปเดต: 28 ตุลาคม 2026
+เป้าหมาย MVP: ค้นหาสถานที่จริงบนแผนที่ OSM เลือกจุดหมาย ดูเส้นทางไปยังจุดหมายนั้น แล้วบันทึกการเดิน/วิ่งพร้อมรูปและ Story 4 หน้า
 
-## ขอบเขต
+## ขอบเขตและการตัดสินใจ
 
-- Bare React Native สำหรับ Android; ไม่ใช้ Expo และไม่รวมงาน iOS
-- คูปอง/ร้านค้าเป็นข้อมูล mock ในเครื่องก่อน ไม่ต้องพึ่งคูปองจริงหรือ Firebase Storage
-- รักษา UI ที่เพื่อนทำไว้ แก้หน้าจอเฉพาะจุดที่ต้องต่อกับข้อมูลจริง อย่ารื้อดีไซน์หรือ navigation โดยไม่จำเป็น
-- Firebase Auth/Firestore มีอยู่ใน dependency และ service บางส่วนแล้ว แต่การเชื่อมข้อมูลรอบนี้ไม่ใช่เงื่อนไขให้คูปอง mock ใช้งานได้
+- ทำ Android prototype ใน Bare React Native ต่อจากโครงสร้างเดิม; ไม่ทำ iOS ในรอบนี้
+- ใช้ MapLibre กับแผนที่จาก OpenStreetMap (OSM) ต่อไป ไม่เปลี่ยนไปใช้ผู้ให้บริการที่คิดตามโควต้าฟรีหรือ API key แบบมี quota
+- ผู้ใช้ค้นหาสถานที่จริง เลือกจุดหมาย แล้วกด **ไปกันเลย** เพื่อเปิดหน้า Record พร้อมจุดหมายและเส้นทางบนแผนที่
+- แสดงเส้นทางบนแผนที่และความคืบหน้าจาก GPS เท่านั้น **ไม่มีคำแนะนำเลี้ยวตามทาง ไม่มี turn-by-turn และไม่มีเสียงนำทาง**
+- ระหว่างบันทึก ผู้ใช้เริ่ม หยุดชั่วคราว ต่อ จบ และเปิดกล้องถ่ายรูประหว่างกิจกรรมได้
+- หลังจบ สร้าง Story 4 หน้าโดยอิงตัวอย่างภาพที่แนบ ใช้สถิติ/รูปจากกิจกรรมจริง และใช้รูปแมวจาก `D:\Project\Ca-walk\Assests\Cat\Photo`
+- คูปองและร้านค้าเดิมคงเป็น mock ในเครื่องสำหรับ prototype; ไม่ขยายระบบคูปองหรือเชื่อม Firebase เพิ่มในงาน MVP นี้ เว้นแต่จำเป็นเพื่อไม่ให้ flow เดิมเสีย
+- ไม่รื้อ UI และ navigation เดิมเกินจำเป็น; ไม่ย้ายหรือเขียน service ที่มีอยู่ใหม่โดยไม่มีเหตุผล
 
-## สถานะปัจจุบันที่ตรวจจาก source
+## ข้อควรรู้เรื่อง OSM และบริการ
 
-| ส่วน | สถานะจริง | สิ่งที่ยังขาด |
+OSM เป็นชุดข้อมูลแผนที่ ไม่ได้หมายความว่า tile, geocoding หรือ routing server ทุกแห่งให้บริการฟรีแบบไม่จำกัด การค้นหาและคำนวณเส้นทางต้องเรียกบริการที่มีนโยบายรองรับการใช้งานนั้นแยกจากการโหลดแผนที่
+
+- ใช้ OSM raster tile endpoint ที่เลือกเพียง endpoint เดียวและทำตามนโยบายของผู้ให้บริการ; อย่ากระจายโหลดไป `a.tile`/`b.tile` เพื่อหลบข้อจำกัด และอย่าอธิบายบริการสาธารณะว่า unlimited
+- แสดง attribution `© OpenStreetMap contributors` บนแผนที่อย่างเห็นได้ชัด และตรวจการแสดงผล/การ cache ให้ตรงนโยบายของ endpoint ที่ใช้
+- ค้นหาจากบริการ geocoding ที่ใช้ข้อมูล OSM โดยส่งคำขอเมื่อผู้ใช้กดค้นหา ไม่ทำ autocomplete หรือยิงคำขอซ้ำถี่ ๆ หากนโยบาย endpoint ไม่อนุญาต
+- ขอเส้นทางเดินจากบริการ routing ที่ใช้ข้อมูล OSM แยกต่างหาก เส้นที่ได้เป็น route preview ไปยังจุดหมาย ไม่ใช่คำสั่งนำทางรายช่วง
+- เก็บ URL ของ endpoint เป็น config ที่เปลี่ยนได้ ไม่ฝัง credential ลับในแอป
+- สำหรับ prototype ให้ใช้ endpoint สาธารณะได้เฉพาะตามนโยบาย/ข้อจำกัดที่ประกาศไว้และยอมรับว่าอาจช้า/หยุดให้บริการ; ก่อนปล่อยให้ผู้ใช้จำนวนมาก ต้องเตรียม hosting ที่ยั่งยืน เช่น self-host OSM tiles, geocoding และ routing หรือเลือกผู้ให้บริการที่มีข้อตกลงชัดเจน
+
+## สถานะจริงจาก source
+
+| ส่วน | มีแล้ว | งานที่ยังขาด |
 | --- | --- | --- |
-| Android native | มี Android project, permission `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACTIVITY_RECOGNITION`; เปิด New Architecture | ต้องติดตั้ง/เปิดแอปบน Android device จริงและยืนยัน permission/runtime behavior |
-| Map SDK | `@maplibre/maplibre-react-native` `^11.5.0` อยู่ใน `package.json` และเคยปรากฏใน Android build output | ยังไม่ถูกใช้ใน `MapScreen`; ปัจจุบันเป็นพื้นหลังถนนวาดเองและหมุดจาก `x/y` |
-| ตำแหน่ง | `src/services/motionTracker.ts` ขอ permission และเรียก `react-native-geolocation-service.watchPosition` | ยังไม่มีหน้าจอแสดงตำแหน่ง GPS ที่ใช้งานจริง; ต้องทดสอบ accuracy, denial, GPS ปิด และตำแหน่งจำลอง |
-| ก้าว | มี accelerometer step detector ใน `motionTracker.ts` | threshold ปัจจุบันเป็น heuristic; ยังไม่ผ่านการทดสอบ/ปรับเทียบกับการเดินจริง และหน้า Record ไม่ได้ใช้ |
-| ระยะ/เพซ/ความเร็ว | `src/services/locationUtils.ts` มีแปลงก้าว/ระยะ, pace, speed, fraud threshold 18 km/h และ Haversine/geofence 50 m | ต้องกำหนดให้ชัดว่า distance จริงหลักมาจาก GPS track; อย่าบวก GPS distance กับ step-derived distance ซ้ำ |
-| Run session | `src/context/AppContext.tsx` มี `startRunSession`, `endRunSession`, active session, history, speed check และบันทึก Firestore เมื่อมี Firebase user | `App.tsx` ยังไม่ห่อด้วย `AppProvider`; screens ไม่ได้อ่าน context จึงยังไม่เกิด flow ในแอป |
-| ร้านค้า/คูปอง mock | `src/services/mockData.ts` มี `MOCK_USER`, ร้าน 5 ร้าน, ดีลระยะทาง, `MOCK_COUPONS`; context มีแลกคูปอง, redeem และ metrics | หน้าจอหลักยัง import `src/data/mock.ts` ซึ่งเป็นข้อมูลอีกชุด; ปุ่ม/ยอดคงเหลือจึงไม่เปลี่ยนตาม context |
-| Record UI | `src/screens/RecordScreen.tsx` คำนวณ km/steps จากเวลาและค่าความเร็วจำลอง; มี pause/resume และ summary | ต้องให้ปุ่มเริ่ม/จบ/พักเรียก session จริง และแสดงค่าจาก `activeSession` |
-| Coupon/Wallet/Store UI | `DistanceWalletScreen`, `MyCouponsScreen`, `StoreDetailScreen`, `MapScreen` import static mock data | ต้องเชื่อมข้อมูลร้านและคูปองกับ AppContext ให้แลกแล้วเห็นคูปอง และใช้แล้วเปลี่ยนสถานะจริงใน runtime |
+| Android/app shell | Android project, permission location/activity recognition, navigation และ `AppProvider` ถูก mount แล้วใน `App.tsx` | ทดสอบ permission และ lifecycle บนอุปกรณ์จริง |
+| แผนที่ | `MapScreen.tsx` และ `RecordScreen.tsx` ใช้ MapLibre และ OSM raster tiles แล้ว | ตรวจ endpoint และ attribution ที่มองเห็นได้; ปัจจุบันค้นหาได้เฉพาะร้าน hardcode 5 แห่ง และยังไม่มี search/geocoding สถานที่จริง |
+| จุดหมาย/เส้นทาง | มีหมุดและ polyline บนแผนที่ | ยังไม่มี route service จริงและยังไม่ส่งจุดหมายที่เลือกไป Record; Record เริ่มด้วยพิกัด/เส้นตัวอย่าง |
+| GPS/ก้าว | `AppContext.tsx` และ `motionTracker.ts` มี location watch, permission, accelerometer step detector และ session logic | ต้องยืนยันข้อมูล sensor/ระยะจริงใน UI, filter จุด GPS, lifecycle/background และพฤติกรรม pause/resume |
+| Record | มีหน้าจอเลือกกิจกรรม, ปุ่มควบคุม, แผนที่, สรุป และกล้องแยกหน้าจอ | pause/resume เปลี่ยน phase ของ UI แต่ยังไม่หยุด/ต่อ tracker และ timer ใน context; ยังมีค่า stat fallback และ action ระยะ mock |
+| ภาพกิจกรรม | `RecordCameraScreen.tsx` ถ่ายภาพด้วยกล้อง และส่ง URI ชั่วคราวกลับผ่านตัวแปรใน `App.tsx` | ผูกภาพกับ session ให้ครบและจัดการหลายภาพ/อายุไฟล์ให้เหมาะสม |
+| Story | `RecordStoryScreen.tsx` มี 4 หน้า, capture เป็น PNG และเปิด share sheet ได้ | ข้อความ/ตัวเลข/ชื่อสถานที่บางส่วนยัง hardcode; รูปแมวเป็น `CatAvatar`; ต้องใช้รูปจาก `Assests/Cat/Photo` และรูปกิจกรรมจริง |
+| คูปอง | มี mock services/context และหน้าจอ wallet/coupon/store | อย่าขยายขอบเขตในรอบแผนที่/กิจกรรม; คง behavior เดิมและกันไม่ให้เชื่อม flow ใหม่แล้วเกิด regression |
 
-## ข้อสรุปทางเทคนิคสำหรับ prototype
+## ลำดับการทำงาน
 
-1. ใช้ MapLibre ที่ติดตั้งอยู่แล้ว แสดงแผนที่ tile จริง, ตำแหน่งผู้ใช้ และหมุดร้านจาก latitude/longitude ใน `MOCK_MERCHANTS`; ไม่ใช้ `x/y` สำหรับตำแหน่งจริง
-2. ใช้ GPS segment ที่ผ่าน validation เป็นแหล่งคำนวณระยะทางหลัก ส่วน accelerometer นับก้าวแยกต่างหาก ระยะจากก้าวเป็นข้อมูลประมาณการ/ตรวจความสมเหตุสมผลเท่านั้น
-3. เมื่อความเร็ว segment เกิน 18 km/h ให้ระงับการเพิ่มระยะทางของ segment นั้นและแจ้งเตือน ไม่ควรลบระยะที่บันทึกก่อนหน้า
-4. เก็บ session, ยอดระยะสะสม/แลกได้, ร้าน และคูปองใน AppContext สำหรับการสาธิตใน process ปัจจุบันก่อน ระบุชัดว่าข้อมูล mock อาจหายเมื่อปิดแอป เว้นแต่เพิ่ม persistence ในขอบเขตแยก
-5. การแลกคูปองหัก `redeemableDistanceKm` แต่ไม่ลด `totalDistanceKm`; การกดใช้คูปองเปลี่ยนสถานะเป็นใช้แล้วและอัปเดต metrics mock
-6. MapLibre ต้องมี style/tile URL ที่ใช้งานได้และ network access; ตรวจเงื่อนไขผู้ให้บริการ tile/token ก่อนเลือก URL อย่าฝัง secret token ลง Git
+### 1. ทำแผนที่ OSM ให้โปร่งใสและมีสถานะผิดพลาด
 
-## แผนลงมือทำตามลำดับ
+**ไฟล์หลัก:** `src/screens/MapScreen.tsx`, `src/screens/RecordScreen.tsx`, config/service สำหรับ URL ของ map
 
-### 1. Mount state และยืนยันสัญญาข้อมูล
+- ตรวจ tile endpoint ปัจจุบันและเลือก endpoint OSM ที่อนุญาตการใช้งาน prototype; เอารายการ host สำรองที่ใช้หลบข้อจำกัดออก
+- แสดง OSM attribution บนทุกหน้าที่มีแผนที่ ไม่ซ่อน attribution ไว้เฉพาะใน style metadata
+- เพิ่ม loading/error/offline state ที่เข้าใจได้ และไม่ทำให้ marker/route ถูกเข้าใจว่าเป็นข้อมูลจริงเมื่อยังโหลดไม่สำเร็จ
+- อย่าแสดงตำแหน่งกรุงเทพฯ หรือพิกัดตัวอย่างเป็นตำแหน่งผู้ใช้จริงเมื่อ GPS ยังไม่มี fix
 
-**ไฟล์หลัก:** `App.tsx`, `src/context/AppContext.tsx`, `src/services/mockData.ts`, `src/data/mock.ts`
+**รับงานเมื่อ:** Android แสดง tile OSM, attribution อ่านได้, endpoint error แสดงสถานะ, และไม่มี fallback พิกัดปลอมที่สื่อว่าเป็น GPS จริง
 
-- ครอบ navigation ด้วย `AppProvider` ในตำแหน่งที่ทุก screen ใช้ context ได้ โดยไม่เปลี่ยน flow navigation
-- ตรวจว่าร้านใน UI ใช้ `merchantId` เดียวกับข้อมูลใน context; ทำ adapter ระหว่าง `Store` เดิมกับ `Merchant` ถ้าจำเป็น อย่ากระจายการแปลงซ้ำหลาย screen
-- กำหนด behavior ของ state ตอนแอปเริ่มใหม่ให้ชัด: prototype ใน memory หรือเพิ่ม AsyncStorage หาก dependency มีอยู่แล้ว; อย่าเพิ่ม Firebase requirement เพื่อให้ flow mock ผ่าน
-- ตรวจว่า session/coupon operation ป้องกันกดซ้ำ, ค่าติดลบ/NaN, แลกไม่พอ, คูปองที่ใช้แล้ว และ session ที่ยังไม่จบ
+### 2. ค้นหาสถานที่จริงและเลือกจุดหมาย
 
-**รับงานเมื่อ:** แอป render ภายใต้ provider ได้, TypeScript ผ่าน และ state ใน context เป็น source of truth สำหรับ flow ที่กำลังเชื่อม
+**ไฟล์หลัก:** `src/screens/MapScreen.tsx`, service ใหม่/ที่มีอยู่สำหรับ OSM geocoding, navigation params ใน `App.tsx`
 
-### 2. ต่อ MapLibre กับร้านและตำแหน่งปัจจุบัน
+- เพิ่มช่องค้นหาที่ส่ง query เมื่อผู้ใช้กดค้นหา; แสดง loading, ผลลัพธ์, ไม่มีผลลัพธ์, network error และลองใหม่
+- ค้นหาสถานที่จาก geocoding endpoint ที่ใช้ OSM; ระบุพิกัด `[longitude, latitude]` ให้ชัดและตรวจข้อมูลตอบกลับก่อนวาง marker
+- ให้เลือกผลลัพธ์หนึ่งรายการและเห็นชื่อ/ตำแหน่งที่เลือกบนแผนที่; ร้าน mock เดิมอาจคงไว้เป็น overlay แยก แต่ห้ามปะปนกับผลค้นหาจริง
+- กำหนดการเรียกแบบกดค้นหาและจัดการการกดซ้ำ/คำขอเก่ากลับมาทีหลัง โดยเคารพ usage policy ของ endpoint
 
-**ไฟล์หลัก:** `src/screens/MapScreen.tsx`, `src/services/motionTracker.ts` หรือ service location แยกถ้าจำเป็น, `android/app/src/main/AndroidManifest.xml`
+**รับงานเมื่อ:** ค้นหาชื่อสถานที่จริงได้บนเครื่อง, เลือกผลลัพธ์ได้, marker อยู่ตรงพิกัดที่ตอบกลับ และทุกสถานะ error/ว่างทำงานโดยไม่ crash
 
-- แทน placeholder map ด้วย MapLibre component ตาม API ของเวอร์ชันที่ติดตั้ง
-- ใช้ style URL/tile provider ที่ได้รับอนุญาตและทดสอบว่าโหลดได้; แสดง loading/error state เมื่อ offline หรือ tile ใช้ไม่ได้
-- วางกล้องเริ่มต้นบริเวณบรรทัดทอง-สามย่าน; แสดง user location เมื่อได้รับ permission และ marker ร้านจากพิกัดจริง
-- ขอ permission ตอนผู้ใช้เริ่มใช้ตำแหน่ง ไม่ขอซ้ำโดยไม่จำเป็น; กรณีปฏิเสธหรือปิด GPS ต้องไม่ crash และมีทางกลับ/ลองใหม่
-- แสดงสถานะ accuracy/ตำแหน่งไม่พร้อม และไม่แสร้งแสดงตำแหน่งจริงหากยังไม่มี fix
+### 3. Route preview และปุ่ม “ไปกันเลย”
 
-**รับงานเมื่อ:** เปิดแผนที่ tile จริงบน Android, เห็นหมุดจากพิกัดร้าน, ตำแหน่งผู้ใช้ขยับตามเครื่อง และกรณี permission/network error ไม่ทำให้หน้าจอพัง
+**ไฟล์หลัก:** `src/screens/MapScreen.tsx`, route service, `App.tsx`, `src/screens/RecordScreen.tsx`
 
-### 3. ต่อ Record UI เข้ากับ sensor/GPS sessions
+- เมื่อเลือกจุดหมาย ให้คำนวณเส้นทางเดินจากตำแหน่งปัจจุบันไปยังจุดหมายด้วย OSM-based routing endpoint และแสดงเส้นทาง/ระยะทางบนแผนที่
+- เมื่อ GPS ยังไม่มีตำแหน่ง ให้ขอ permission/รอ fix หรือแจ้งให้ผู้ใช้ทราบ; อย่าคำนวณ route จากพิกัดตัวอย่าง
+- ปุ่ม **ไปกันเลย** ส่ง destination ที่มี id/ชื่อ/พิกัด และ route geometry/ระยะตามความจำเป็น ไปหน้า Record ผ่าน navigation params
+- หน้า Record แสดง destination และเส้น route preview ที่เลือก พร้อมแยกจาก actual GPS track ที่บันทึกระหว่างกิจกรรม
+- route ไม่ต้องเปลี่ยนตามตำแหน่งระหว่างทางใน MVP; แสดงความคืบหน้าจากตำแหน่งล่าสุด/จุดหมายได้ แต่ไม่บอกเลี้ยว ไม่สร้างรายการขั้นตอนนำทาง และไม่เล่นเสียง
+- ถ้า route service ใช้ไม่ได้ ให้แจ้งชัดเจนและยังอนุญาตเริ่มบันทึกกิจกรรมได้โดยไม่มี route preview; ห้ามแสดงเส้นปลอม
+
+**รับงานเมื่อ:** เลือกสถานที่แล้วเห็นเส้นทางเดินและระยะที่มาจาก service; กด “ไปกันเลย” แล้ว Record ได้ destination เดิม; ไม่มี UI หรือเสียงคำสั่งเลี้ยว
+
+### 4. บันทึกการเดิน/วิ่งจาก GPS และ sensor จริง
 
 **ไฟล์หลัก:** `src/screens/RecordScreen.tsx`, `src/context/AppContext.tsx`, `src/services/motionTracker.ts`, `src/services/locationUtils.ts`, `src/screens/RecordSummaryScreen.tsx`
 
-- ให้ start เรียก `startRunSession`; pause ต้องหยุด/พัก timer และ tracking โดยรักษาค่า session; resume ต้องกลับมาต่อ session เดิม; finish เรียก `endRunSession`
-- แสดง `activeSession.steps`, `distanceKm`, `currentPace`, `durationSeconds`; เอาการคำนวณจาก `SPEED` และ `STEP_M` แบบจำลองออกจาก path ที่ใช้บันทึกจริง
-- ใช้ GPS distance ระหว่าง fix ที่ accuracy ผ่านเกณฑ์ และกรอง jump/ความเร็วเกิน 18 km/h; ระบุ threshold accuracy/minimum segment ในโค้ดและปรับได้
-- accelerometer นับก้าวต่อ session; ตรวจ detector กับการเดินจริงหลายจังหวะ/ถือเครื่องหลายแบบและบันทึกข้อจำกัดว่าเป็น prototype
-- จัดการ permission denial, GPS unavailable, sensor error, app background/กลับ foreground และการกดจบระหว่างรอ permission
-- summary/history ต้องตรงกับ session ที่เพิ่งจบ; ห้ามเพิ่มยอดรวม/ระยะแลกได้ซ้ำเมื่อกดจบซ้ำ
+- ให้ start เริ่ม session เดียวและเริ่ม timer/GPS/step tracking; pause หยุดนับเวลาและหยุด/ละเว้น sensor/GPS สำหรับ session โดยรักษาค่าก่อนพัก; resume ต่อ session เดิม; finish ปิด session ครั้งเดียว
+- แสดงเวลา active (ไม่รวมเวลาพัก), steps จาก accelerometer, distance จาก GPS track ที่ผ่าน validation และ pace ที่คำนวณจากข้อมูล session; เอาค่า fallback จำลองและ `addMockDistance` ออกจาก path ปกติของ Record
+- วาด actual track จาก GPS fixes ที่ใช้คำนวณจริง และแสดง route preview ไปจุดหมายเป็นคนละ geometry/style; อย่าต่อเส้นตัวอย่างเข้ากับ track
+- ใช้ accuracy/time/distance checks เพื่อลด GPS jump และกัน segment ความเร็วเกินเกณฑ์เดิม 18 km/h ออกจากระยะที่นำไปคำนวณรางวัล; ก้าวเป็นตัวชี้วัดแยก ไม่บวกระยะก้าวซ้ำกับ GPS
+- จัดการ permission denied, GPS ปิด/ไม่มี fix, sensor error, app background/กลับ foreground, กดซ้ำ และจบขณะเริ่ม tracker
+- สรุปหลังจบต้องสะท้อน session เดียวกับหน้าบันทึก และไม่เพิ่มระยะสะสมซ้ำเมื่อจบซ้ำ
 
-**รับงานเมื่อ:** เดินจริง 5-10 นาทีแล้ว steps เพิ่ม, GPS route/distance เพิ่มอย่างสมเหตุสมผล, pace/duration สอดคล้อง, segment ที่เกิน 18 km/h ไม่ให้รางวัลระยะ และจบ session แล้ว summary/history/ยอดสะสมอัปเดตครั้งเดียว
+**รับงานเมื่อ:** บนอุปกรณ์ Android เดินจริงแล้ว GPS track/ระยะและ steps เปลี่ยน; พักแล้วเวลาและระยะไม่เพิ่ม ต่อแล้วใช้ session เดิม จบแล้ว summary ตรงกัน; ปิด GPS/ไม่อนุญาต permission แล้วแอปไม่ crash และไม่สร้างข้อมูลจริงปลอม
 
-### 4. ต่อร้านค้า, wallet และคูปอง mock แบบ end-to-end
+### 5. ถ่ายภาพระหว่างกิจกรรมและทำ Story 4 หน้า
 
-**ไฟล์หลัก:** `src/screens/DistanceWalletScreen.tsx`, `src/screens/StoreDetailScreen.tsx`, `src/screens/MyCouponsScreen.tsx`, `src/screens/MapScreen.tsx`, `src/context/AppContext.tsx`
+**ไฟล์หลัก:** `App.tsx`, `src/screens/RecordCameraScreen.tsx`, `src/screens/RecordStoryScreen.tsx`, `src/screens/RecordStoryScreen.styles.ts`, assets ใน `Assests/Cat/Photo`
 
-- ใช้ข้อมูลร้าน/คูปอง/ยอดระยะจาก context; คงหน้าตาและ navigation เดิม
-- เพิ่ม action แลกดีลของร้านที่เลือก เรียก `exchangeDistanceForCoupon(merchantId)` และแสดงผลสำเร็จ/ระยะไม่พอ
-- คูปองที่แลกต้องปรากฏใน My Coupons; ปุ่มใช้คูปองเรียก `redeemMockCoupon(couponId)` และเปลี่ยนเป็น used พร้อม metrics ร้านเพิ่มตาม logic ที่มี
-- ตรวจ geofence ก่อนเปิด action QR/ใช้หน้าร้านตาม UX เดิม; ถ้ายังไม่มี QR จริงให้แสดง mock code/token และติดป้ายว่าเป็น prototype
-- ระบุให้ชัดว่าการแลก/ใช้เป็น client-side mock ไม่ใช่ระบบป้องกันโกงหรือการชำระเงินจริง
+- เปิดกล้องจากหน้า Record โดยไม่ทิ้งสถานะ session; หลังถ่ายกลับมาที่ Record และผูก URI กับ activity ที่กำลังบันทึก
+- รองรับการถ่ายมากกว่าหนึ่งภาพ หรือกำหนดภาพหลักหนึ่งภาพสำหรับ MVP ให้ตรงกับ UX; URI ต้องยังอ่านได้ตอนสร้าง/แชร์ Story ไม่ใช่อาศัย temporary file ที่หายก่อน
+- ทำ Story 4 หน้าโดยใช้ภาพแนบ `Ref_Highlight1.png`, `Ref_Highlight2.png`, `Ref_Highlight3.png`, `Ref_HighlightLastPage.png` เป็นแนวทางจัดองค์ประกอบเท่านั้น ไม่คัดลอกข้อความหรือตัวเลขตัวอย่าง
+- แสดงข้อมูลจริงของ session เช่น ระยะ, เวลา, steps, pace และปลายทางที่เลือก; เมื่อข้อมูลไม่มี ให้แสดงสถานะไม่มีข้อมูลแทนการใส่ตัวเลข/สถานที่สมมติ
+- แทน `CatAvatar` ใน Story ด้วยรูปแมวจาก `D:\Project\Ca-walk\Assests\Cat\Photo`; เลือกภาพที่เหมาะกับหน้าและจัดวางไม่บังสถิติ/ภาพถ่าย
+- แชร์ภาพแต่ละหน้า หรือแชร์หน้า/ภาพที่ผู้ใช้เลือกผ่าน native share sheet; แสดงความล้มเหลวโดยไม่ทำให้กิจกรรมหรือภาพสูญหาย
 
-**รับงานเมื่อ:** เริ่มที่ระยะไม่พอแล้วแลกไม่ได้; เพิ่มระยะจนพอแล้วแลกได้ 1 ครั้ง, balance ลดถูกต้อง, คูปองเข้ากระเป๋า, ใช้แล้วใช้ซ้ำไม่ได้ และ metrics ร้านเปลี่ยนทันที
+**รับงานเมื่อ:** บันทึกเสร็จแล้ว Story ครบ 4 หน้า, ข้อมูลทุกหน้ามาจาก activity จริง, รูปที่ถ่ายเปิดแสดงได้, มีรูปแมวจากโฟลเดอร์ที่กำหนด และแชร์ภาพออกจากแอปได้
 
-### 5. Android verification และส่งมอบ
+### 6. คงคูปอง mock และตรวจ regression
 
-**ไฟล์/คำสั่ง:** ใช้ Android project ใน `D:\Project\Ca-walk\android`
+**ไฟล์หลัก:** `src/context/AppContext.tsx`, `src/screens/DistanceWalletScreen.tsx`, `src/screens/MyCouponsScreen.tsx`, `src/screens/StoreDetailScreen.tsx`
 
-- รัน `npm test -- --runInBand` และ `npm run lint` (แก้เฉพาะ failure ที่เกี่ยวกับงานนี้)
-- รัน `npx tsc --noEmit` หาก tsconfig รองรับ และตรวจผลจริงก่อนรายงาน
-- จาก `android`: `.\gradlew.bat assembleDebug`
-- ติดตั้งบน Android device จริง: `.\gradlew.bat installDebug`; ทดสอบ permission, GPS, map tiles และ flow กิจกรรม/คูปองบนเครื่อง ไม่ถือว่า build ผ่านเท่ากับ hardware behavior ผ่าน
-- บันทึก device/API level, ผล build, test, permission ที่อนุญาต, ข้อจำกัด tile/token และ known issues
+- ไม่เพิ่ม backend, payment หรือระบบคูปองจริงใน MVP นี้
+- ตรวจว่า flow map/record/story ไม่เปลี่ยน state ของ wallet/coupon โดยไม่ตั้งใจ; ถ้าคูปองยังไม่เชื่อมกับ session จริง ให้คงป้าย/พฤติกรรม mock ตามเดิมและบันทึกไว้ชัดเจน
 
-## Acceptance checklist สำหรับเพื่อน
+**รับงานเมื่อ:** ฟีเจอร์ใหม่ไม่ทำให้แอปเปิดไม่ได้หรือทำให้ coupon mock ที่มีอยู่พัง; ไม่กล่าวอ้างว่าคูปองเป็นการแลกจริง
 
-- [ ] Map เป็น tile map จริง ไม่ใช่พื้นหลังวาดเอง; marker ร้านใช้ latitude/longitude
-- [ ] ตำแหน่งเครื่องแสดงเมื่อ permission/GPS พร้อม และมี fallback ที่ซื่อสัตย์เมื่อไม่พร้อม
-- [ ] ก้าวมาจาก accelerometer และระยะมาจาก GPS track ที่กรองแล้ว ไม่มีการนับระยะซ้ำจาก step estimate
-- [ ] เริ่ม/พัก/ต่อ/จบ run ได้; pace, duration, steps, distance และ summary ตรงกัน
-- [ ] ความเร็วมากกว่า 18 km/h ไม่สร้างระยะที่นำไปแลกรางวัลได้
-- [ ] ระยะสะสมไม่ลดเมื่อแลก; ระยะแลกได้ลดตามดีล
-- [ ] แลกแล้วได้ mock coupon ในกระเป๋า; ใช้ได้ครั้งเดียวและ metrics ร้านอัปเดต
-- [ ] permission denied, GPS off, map offline และการแลกไม่พอไม่ทำให้แอป crash
-- [ ] Android debug APK build ผ่านและทดสอบบนอุปกรณ์จริงอย่างน้อยหนึ่งเครื่อง
+### 7. ตรวจบน Android และบันทึกผลส่งต่อ
+
+- รัน test/lint/typecheck/build ตาม scripts ที่มีใน `package.json` และ Android Gradle project; รายงานเฉพาะคำสั่งที่รันจริงและผลจริง
+- ติดตั้งบน Android device จริงอย่างน้อยหนึ่งเครื่องและตรวจ permission, GPS, OSM tiles, search, route preview, ไปกันเลย, start/pause/resume/finish, camera และ share sheet
+- ทดสอบ network หาย, endpoint ปฏิเสธ/จำกัดคำขอ, permission denied, GPS ปิด และ location accuracy ต่ำ
+- บันทึก device/API level, endpoint ที่ใช้, ข้อจำกัด/นโยบายที่ตรวจแล้ว, test/build result และ known issues
+
+## Acceptance checklist
+
+- [ ] MapLibre ใช้ OSM tiles พร้อม attribution ที่อ่านได้ และไม่มีการกระจายคำขอไปหลาย host เพื่อหลบข้อจำกัด
+- [ ] ค้นหาสถานที่จริงได้จาก geocoding endpoint; ไม่มีผลลัพธ์/error/network state แสดงถูกต้อง
+- [ ] เลือกจุดหมายแล้วเห็น route preview และระยะจาก routing endpoint
+- [ ] “ไปกันเลย” เปิด Record พร้อมจุดหมายที่เลือกและ route preview
+- [ ] ไม่มีคำแนะนำเลี้ยวทีละช่วง ไม่มี turn-by-turn และไม่มีเสียงนำทาง
+- [ ] GPS track ที่บันทึกจริงแยกจากเส้น route preview; ไม่มีพิกัดหรือค่าสถิติปลอมในสถานะ GPS/session ว่าง
+- [ ] เริ่ม/หยุดชั่วคราว/ต่อ/จบทำงานกับ tracker และ timer จริง; เวลาพักไม่นับรวม
+- [ ] Steps มาจาก accelerometer; ระยะกิจกรรมมาจาก GPS ที่กรองแล้ว ไม่บวกระยะ step ซ้ำ
+- [ ] เปิดกล้องถ่ายระหว่าง session กลับมาบันทึกต่อได้ และรูปยังอยู่ตอนสร้าง Story
+- [ ] Story มี 4 หน้า ใช้สถิติจริง รูปแมวจาก `Assests/Cat/Photo` และแชร์ได้
+- [ ] network/permission/GPS/service failure ไม่ทำให้แอป crash และไม่แสดงข้อมูลจริงปลอม
+- [ ] coupon mock เดิมยังใช้งานตามเดิมโดยไม่มีการอ้างว่าเป็นระบบคูปองจริง
+- [ ] Android debug build ผ่านและ flow หลักได้รับการตรวจบนอุปกรณ์จริงอย่างน้อยหนึ่งเครื่อง
 
 ## จุดเริ่มสำหรับผู้รับงาน
 
-อ่านตามลำดับ: `HANDS-OFF.md` → เอกสารนี้ → `App.tsx` → `src/context/AppContext.tsx` → `src/services/motionTracker.ts` / `locationUtils.ts` → หน้าจอ Record/Map/Wallet/Coupons
+อ่าน `HANDS-OFF.md` แล้วอ่านเอกสารนี้ จากนั้นตรวจ `App.tsx`, `src/context/AppContext.tsx`, `src/services/motionTracker.ts`, `src/services/locationUtils.ts`, `src/screens/MapScreen.tsx`, `src/screens/RecordScreen.tsx`, `src/screens/RecordCameraScreen.tsx` และ `src/screens/RecordStoryScreen.tsx` ตามลำดับ
 
-อย่าเริ่มด้วยการเขียน tracker หรือระบบคูปองใหม่ทั้งหมด: implementation ฝั่ง service/context มีอยู่แล้ว จุดติดหลักคือยังไม่ mount provider และยังไม่ได้ต่อ screens เข้ากับ state จริง; MapLibre มี dependency แล้วแต่ Map screen ยังเป็น placeholder.
+อย่าเริ่มเขียน MapLibre, camera, Story หรือ session ใหม่ทั้งหมด เพราะโครงเหล่านี้มีอยู่แล้ว จุดที่ยังขาดคือค้นหาสถานที่และ route จริง, ส่ง destination ข้ามหน้า, ทำให้ pause/resume ควบคุม tracker/timer จริง, เอาข้อมูลตัวอย่างออกจาก flow บันทึก และใช้ภาพแมว/สถิติจริงใน Story

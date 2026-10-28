@@ -25,7 +25,7 @@ export interface MotionTrackerHandle {
 
 type GeolocationApi = Pick<
   typeof GeolocationModule,
-  'watchPosition' | 'clearWatch'
+  'watchPosition' | 'clearWatch' | 'getCurrentPosition'
 >;
 
 // The package typings declare named exports, but js/index.js only exports a default object.
@@ -76,6 +76,80 @@ export async function requestMotionPermissions(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function requestLocationPermissions(): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return true;
+  }
+  const { ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION } =
+    PermissionsAndroid.PERMISSIONS;
+  try {
+    const results = await PermissionsAndroid.requestMultiple([
+      ACCESS_FINE_LOCATION,
+      ACCESS_COARSE_LOCATION,
+    ]);
+    const granted = PermissionsAndroid.RESULTS.GRANTED;
+    return (
+      results[ACCESS_FINE_LOCATION] === granted ||
+      results[ACCESS_COARSE_LOCATION] === granted
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function startLocationWatch(
+  onLocation: (location: TrackedLocation) => void,
+  onError?: (error: Error) => void,
+): Promise<MotionTrackerHandle> {
+  const granted = await requestLocationPermissions();
+  if (!granted) {
+    throw new Error('กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อระบุตำแหน่งของคุณ');
+  }
+
+  let watchId: number;
+  try {
+    watchId = Geolocation.watchPosition(
+      ({ coords, timestamp }) => {
+        const speed = coords.speed;
+        onLocation({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: Number.isFinite(coords.accuracy) ? coords.accuracy : null,
+          timestamp,
+          speedKmh:
+            speed !== null && Number.isFinite(speed) && speed >= 0
+              ? speed * 3.6
+              : null,
+        });
+      },
+      (error) => {
+        onError?.(new Error(error.message || 'อ่านตำแหน่ง GPS ไม่สำเร็จ'));
+      },
+      {
+        accuracy: { android: 'high' },
+        enableHighAccuracy: true,
+        distanceFilter: 2,
+        interval: 1000,
+        fastestInterval: 1000,
+        showLocationDialog: true,
+      },
+    );
+  } catch (error) {
+    throw toError(error, 'เริ่มติดตาม GPS ไม่สำเร็จ');
+  }
+
+  let stopped = false;
+  return {
+    stop: () => {
+      if (stopped) {
+        return;
+      }
+      stopped = true;
+      Geolocation.clearWatch(watchId);
+    },
+  };
 }
 
 export async function startMotionTracking(
@@ -138,9 +212,9 @@ export async function startMotionTracking(
       {
         accuracy: { android: 'high' },
         enableHighAccuracy: true,
-        distanceFilter: 1,
+        distanceFilter: 2,
         interval: 1000,
-        fastestInterval: 500,
+        fastestInterval: 1000,
         showLocationDialog: true,
       },
     );

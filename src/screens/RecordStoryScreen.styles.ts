@@ -389,4 +389,24 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
   },
+  catPhotoSmall: {
+    width: 56,
+    height: 56,
+    resizeMode: 'contain',
+  },
+  catPhotoMedium: {
+    width: 88,
+    height: 88,
+    resizeMode: 'contain',
+  },
+  catPhotoLarge: {
+    width: 140,
+    height: 140,
+    resizeMode: 'contain',
+    marginVertical: 4,
+  },
+  storyCatCenter: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
 });

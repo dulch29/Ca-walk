@@ -28,6 +28,8 @@ import {
   stepsToDistanceKm,
 } from '../services/locationUtils';
 import {
+  requestLocationPermissions,
+  startLocationWatch,
   startMotionTracking,
   type MotionTrackerHandle,
   type TrackedLocation,
@@ -39,6 +41,14 @@ import { saveRunActivity } from '../services/firestoreService';
 
 export type AppMode = 'user' | 'merchant';
 
+export interface ActivityDestination {
+  id: string;
+  name: string;
+  coordinates: [number, number]; // [lng, lat]
+  distanceMeters?: number;
+  routeCoordinates?: Array<[number, number]>;
+}
+
 export interface ActiveRunSession {
   sessionId: string;
   startTime: string;
@@ -46,6 +56,10 @@ export interface ActiveRunSession {
   distanceKm: number;
   currentPace: string;
   durationSeconds: number;
+  status: 'recording' | 'paused';
+  destination?: ActivityDestination;
+  photos: string[];
+  trackCoordinates: Array<[number, number]>;
 }
 
 export interface DistanceOperationSuccess<T> {
@@ -73,8 +87,14 @@ export interface AppContextValue {
   currentSpeedKmh: number;
   speedFraudActive: boolean;
   trackingError: string | null;
-  startRunSession: () => Promise<void>;
+  selectedDestination: ActivityDestination | null;
+  setSelectedDestination: (destination: ActivityDestination | null) => void;
+  requestLocationPermission: () => Promise<boolean>;
+  startRunSession: (destination?: ActivityDestination) => Promise<void>;
+  pauseRunSession: () => void;
+  resumeRunSession: () => void;
   endRunSession: () => RunSession | null;
+  addSessionPhoto: (photoUri: string) => void;
   exchangeDistanceForCoupon: (
     merchantId: string,
   ) => DistanceOperationResult<Coupon>;
@@ -124,6 +144,8 @@ export function AppProvider(
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
   const [speedFraudActive, setSpeedFraudActive] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [selectedDestination, setSelectedDestination] =
+    useState<ActivityDestination | null>(null);
 
   const userRef = useRef(user);
   const runHistoryRef = useRef(runHistory);
@@ -131,7 +153,9 @@ export function AppProvider(
   const merchantsRef = useRef(merchants);
   const couponsRef = useRef(coupons);
   const currentLocationRef = useRef<Coordinates | null>(null);
+  const selectedDestinationRef = useRef<ActivityDestination | null>(null);
   const trackerRef = useRef<MotionTrackerHandle | null>(null);
+  const passiveTrackerRef = useRef<MotionTrackerHandle | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousLocationRef = useRef<TrackedLocation | null>(null);
   const committedMockStepsRef = useRef(0);
@@ -139,6 +163,11 @@ export function AppProvider(
   const sessionCounterRef = useRef(0);
   const couponCounterRef = useRef(0);
   const fraudRef = useRef(false);
+  const sustainedFastCountRef = useRef(0);
+
+  useEffect(() => {
+    selectedDestinationRef.current = selectedDestination;
+  }, [selectedDestination]);
 
   const updateUser = useCallback(
     (updater: (previous: MockUser) => MockUser) => {
@@ -164,17 +193,27 @@ export function AppProvider(
 
   const handleStep = useCallback(() => {
     updateActiveSession((previous) => {
-      if (!previous) {
+      if (!previous || previous.status !== 'recording') {
         return previous;
       }
-      return { ...previous, steps: previous.steps + 1 };
+      const nextSteps = previous.steps + 1;
+      const stepDistanceKm = stepsToDistanceKm(nextSteps);
+      // Accelerometer step fusion: ensure distance doesn't stall if GPS is weak
+      const fusedDistanceKm = Math.max(
+        previous.distanceKm,
+        roundDistance(stepDistanceKm * 0.95),
+      );
+      return {
+        ...previous,
+        steps: nextSteps,
+        distanceKm: fusedDistanceKm,
+        currentPace: calculatePace(fusedDistanceKm, previous.durationSeconds),
+      };
     });
   }, [updateActiveSession]);
 
   const handleLocation = useCallback(
     (location: TrackedLocation) => {
-      const previous = previousLocationRef.current;
-      previousLocationRef.current = location;
       currentLocationRef.current = location;
       setCurrentLocation({
         latitude: location.latitude,
@@ -182,44 +221,100 @@ export function AppProvider(
       });
 
       const session = activeSessionRef.current;
-      if (!session) {
+      if (!session || session.status !== 'recording') {
         return;
       }
 
+      // Filter out fixes with poor accuracy (> 25m) to prevent GPS jumps through houses
+      if (location.accuracy !== null && location.accuracy > 25) {
+        return;
+      }
+
+      const previous = previousLocationRef.current;
       let segmentDistanceKm = 0;
       let segmentSpeedKmh = location.speedKmh ?? 0;
+
       if (previous && location.timestamp > previous.timestamp) {
-        segmentDistanceKm =
-          haversineDistanceMeters(previous, location) / 1000;
-        const elapsedSeconds = (location.timestamp - previous.timestamp) / 1000;
+        const elapsedSeconds = Math.max(
+          0.1,
+          (location.timestamp - previous.timestamp) / 1000,
+        );
+        const segmentDistanceMeters = haversineDistanceMeters(previous, location);
+
+        // Anti-glitch: a human walker/runner cannot jump > 6.0 m/s (~21.6 km/h) in small intervals (< 5s)
+        // If distance jumped > 6.0 m/s * elapsedSeconds, it's a GPS multipath glitch jumping across a building
+        const maxRealisticJumpMeters = Math.max(12, elapsedSeconds * 6.0);
+        if (segmentDistanceMeters > maxRealisticJumpMeters && elapsedSeconds < 5) {
+          // Drop this single outlier glitch, do NOT advance previous to this jump
+          return;
+        }
+
+        // Deadband filter: ignore micro-movements < 2.5 meters to prevent stationary jitter/drift
+        if (segmentDistanceMeters < 2.5) {
+          return;
+        }
+
+        segmentDistanceKm = segmentDistanceMeters / 1000;
         const calculatedSpeed = calculateSpeedKmh(
           segmentDistanceKm,
           elapsedSeconds,
         );
         segmentSpeedKmh =
-          location.speedKmh === null
-            ? calculatedSpeed
-            : Math.max(location.speedKmh, calculatedSpeed);
+          location.speedKmh !== null && location.speedKmh > 0
+            ? location.speedKmh
+            : calculatedSpeed;
       }
 
+      // Accept this valid location update
+      previousLocationRef.current = location;
       setCurrentSpeedKmh(Number.isFinite(segmentSpeedKmh) ? segmentSpeedKmh : 0);
-      if (isSpeedFraud(segmentSpeedKmh)) {
-        fraudRef.current = true;
-        setSpeedFraudActive(true);
-        return;
+
+      // Check speed fraud (faster than Pace 2 / 30 km/h):
+      // Require sustained vehicle speed (at least 3 consecutive updates) to prevent false alerts while walking
+      const isTooFast = isSpeedFraud(segmentSpeedKmh);
+      if (isTooFast) {
+        sustainedFastCountRef.current += 1;
+      } else {
+        sustainedFastCountRef.current = 0;
       }
-      if (fraudRef.current || segmentDistanceKm <= 0) {
+
+      const isSustainedVehicleSpeed = sustainedFastCountRef.current >= 3;
+      setSpeedFraudActive(isSustainedVehicleSpeed);
+      if (isSustainedVehicleSpeed) {
+        // Discard distance accumulation while traveling in a vehicle
         return;
       }
 
       updateActiveSession((current) => {
-        if (!current) {
+        if (!current || current.status !== 'recording') {
           return current;
         }
-        const distanceKm = roundDistance(current.distanceKm + segmentDistanceKm);
+        const coord: [number, number] = [location.longitude, location.latitude];
+        if (current.trackCoordinates.length === 0) {
+          return {
+            ...current,
+            trackCoordinates: [coord],
+          };
+        }
+        if (segmentDistanceKm <= 0) {
+          return current;
+        }
+
+        const nextGpsDist = roundDistance(current.distanceKm + segmentDistanceKm);
+        const stepDist = stepsToDistanceKm(current.steps);
+        // Fuse GPS distance with step distance baseline
+        const distanceKm = Math.max(nextGpsDist, roundDistance(stepDist * 0.95));
+
+        const last = current.trackCoordinates[current.trackCoordinates.length - 1];
+        const newTrack =
+          !last || last[0] !== coord[0] || last[1] !== coord[1]
+            ? [...current.trackCoordinates, coord]
+            : current.trackCoordinates;
+
         return {
           ...current,
           distanceKm,
+          trackCoordinates: newTrack,
           currentPace: calculatePace(distanceKm, current.durationSeconds),
         };
       });
@@ -234,75 +329,172 @@ export function AppProvider(
   const stopTracking = useCallback(() => {
     trackerRef.current?.stop();
     trackerRef.current = null;
+    if (passiveTrackerRef.current) {
+      passiveTrackerRef.current.stop();
+      passiveTrackerRef.current = null;
+    }
     if (timerRef.current !== null) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
   }, []);
 
-  const startRunSession = useCallback(async () => {
-    if (activeSessionRef.current) {
+  const requestLocationPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const granted = await requestLocationPermissions();
+      if (granted && !passiveTrackerRef.current && !trackerRef.current) {
+        try {
+          const handle = await startLocationWatch(
+            (loc) => {
+              currentLocationRef.current = loc;
+              setCurrentLocation({
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+              });
+            },
+            (err) => {
+              setTrackingError(err.message);
+            },
+          );
+          passiveTrackerRef.current = handle;
+        } catch {
+          // Non-blocking location acquisition
+        }
+      }
+      return granted;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const startRunSession = useCallback(
+    async (destination?: ActivityDestination) => {
+      if (activeSessionRef.current) {
+        return;
+      }
+
+      if (passiveTrackerRef.current) {
+        passiveTrackerRef.current.stop();
+        passiveTrackerRef.current = null;
+      }
+
+      const chosenDestination =
+        destination ?? selectedDestinationRef.current ?? undefined;
+      sessionCounterRef.current += 1;
+      const startTime = new Date().toISOString();
+      const nextSession: ActiveRunSession = {
+        sessionId: `run_live_${String(sessionCounterRef.current).padStart(4, '0')}`,
+        startTime,
+        steps: 0,
+        distanceKm: 0,
+        currentPace: '-- /km',
+        durationSeconds: 0,
+        status: 'recording',
+        destination: chosenDestination,
+        photos: [],
+        trackCoordinates: [],
+      };
+      committedMockStepsRef.current = 0;
+      committedMockDistanceRef.current = 0;
+      previousLocationRef.current = null;
+      fraudRef.current = false;
+      sustainedFastCountRef.current = 0;
+      setSpeedFraudActive(false);
+      setCurrentSpeedKmh(0);
+      setTrackingError(null);
+      activeSessionRef.current = nextSession;
+      setActiveSession(nextSession);
+
+      try {
+        const tracker = await startMotionTracking({
+          onStep: handleStep,
+          onLocation: handleLocation,
+          onError: handleTrackingError,
+        });
+        if (activeSessionRef.current?.sessionId !== nextSession.sessionId) {
+          tracker.stop();
+          return;
+        }
+        trackerRef.current = tracker;
+      } catch (error) {
+        if (activeSessionRef.current?.sessionId !== nextSession.sessionId) {
+          return;
+        }
+        activeSessionRef.current = null;
+        setActiveSession(null);
+        stopTracking();
+        const message =
+          error instanceof Error ? error.message : 'เริ่มการเดินไม่สำเร็จ';
+        setTrackingError(message);
+        throw error instanceof Error ? error : new Error(message);
+      }
+
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+      }
+      timerRef.current = setInterval(() => {
+        updateActiveSession((session) => {
+          if (!session || session.status !== 'recording') {
+            return session;
+          }
+          const durationSeconds = session.durationSeconds + 1;
+          return {
+            ...session,
+            durationSeconds,
+            currentPace: calculatePace(session.distanceKm, durationSeconds),
+          };
+        });
+      }, 1000);
+    },
+    [
+      handleLocation,
+      handleStep,
+      handleTrackingError,
+      stopTracking,
+      updateActiveSession,
+    ],
+  );
+
+  const pauseRunSession = useCallback(() => {
+    const current = activeSessionRef.current;
+    if (!current || current.status !== 'recording') {
       return;
     }
-
-    sessionCounterRef.current += 1;
-    const startTime = new Date().toISOString();
-    const nextSession: ActiveRunSession = {
-      sessionId: `run_live_${String(sessionCounterRef.current).padStart(4, '0')}`,
-      startTime,
-      steps: 0,
-      distanceKm: 0,
-      currentPace: '-- /km',
-      durationSeconds: 0,
-    };
-    committedMockStepsRef.current = 0;
-    committedMockDistanceRef.current = 0;
-    previousLocationRef.current = null;
-    fraudRef.current = false;
-    setSpeedFraudActive(false);
-    setCurrentSpeedKmh(0);
-    setTrackingError(null);
-    activeSessionRef.current = nextSession;
-    setActiveSession(nextSession);
-
-    try {
-      const tracker = await startMotionTracking({
-        onStep: handleStep,
-        onLocation: handleLocation,
-        onError: handleTrackingError,
-      });
-      // The user may end this run or unmount while Android permissions are pending.
-      if (activeSessionRef.current?.sessionId !== nextSession.sessionId) {
-        tracker.stop();
-        return;
-      }
-      trackerRef.current = tracker;
-    } catch (error) {
-      if (activeSessionRef.current?.sessionId !== nextSession.sessionId) {
-        return;
-      }
-      activeSessionRef.current = null;
-      setActiveSession(null);
-      stopTracking();
-      const message =
-        error instanceof Error ? error.message : 'เริ่มการเดินไม่สำเร็จ';
-      setTrackingError(message);
-      throw error instanceof Error ? error : new Error(message);
+    if (timerRef.current !== null) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-
-    timerRef.current = setInterval(() => {
-      const current = activeSessionRef.current;
-      if (!current) {
-        return;
+    previousLocationRef.current = null;
+    updateActiveSession((session) => {
+      if (!session) {
+        return null;
       }
-      const durationSeconds = Math.max(
-        0,
-        Math.floor((Date.now() - Date.parse(current.startTime)) / 1000),
-      );
+      return { ...session, status: 'paused' };
+    });
+  }, [updateActiveSession]);
+
+  const resumeRunSession = useCallback(() => {
+    const current = activeSessionRef.current;
+    if (!current || current.status !== 'paused') {
+      return;
+    }
+    previousLocationRef.current = null;
+    updateActiveSession((session) => {
+      if (!session) {
+        return null;
+      }
+      return { ...session, status: 'recording' };
+    });
+
+    if (timerRef.current !== null) {
+      clearInterval(timerRef.current);
+    }
+    timerRef.current = setInterval(() => {
       updateActiveSession((session) => {
-        if (!session) {
+        if (!session || session.status !== 'recording') {
           return session;
         }
+        const durationSeconds = session.durationSeconds + 1;
         return {
           ...session,
           durationSeconds,
@@ -310,13 +502,22 @@ export function AppProvider(
         };
       });
     }, 1000);
-  }, [
-    handleLocation,
-    handleStep,
-    handleTrackingError,
-    stopTracking,
-    updateActiveSession,
-  ]);
+  }, [updateActiveSession]);
+
+  const addSessionPhoto = useCallback(
+    (photoUri: string) => {
+      updateActiveSession((previous) => {
+        if (!previous) {
+          return previous;
+        }
+        return {
+          ...previous,
+          photos: [...previous.photos, photoUri],
+        };
+      });
+    },
+    [updateActiveSession],
+  );
 
   const endRunSession = useCallback((): RunSession | null => {
     const current = activeSessionRef.current;
@@ -326,10 +527,7 @@ export function AppProvider(
 
     stopTracking();
     const endTime = new Date().toISOString();
-    const durationSeconds = Math.max(
-      current.durationSeconds,
-      Math.floor((Date.parse(endTime) - Date.parse(current.startTime)) / 1000),
-    );
+    const durationSeconds = current.durationSeconds;
     const distanceKm = roundDistance(current.distanceKm);
     const completed: RunSession = {
       sessionId: current.sessionId,
@@ -339,6 +537,9 @@ export function AppProvider(
       steps: current.steps,
       distanceKm,
       averagePace: calculatePace(distanceKm, durationSeconds),
+      destinationName: current.destination?.name,
+      photos: current.photos,
+      trackCoordinates: current.trackCoordinates,
     };
     const newRunHistory = [...runHistoryRef.current, completed];
     runHistoryRef.current = newRunHistory;
@@ -385,6 +586,7 @@ export function AppProvider(
     committedMockStepsRef.current = 0;
     committedMockDistanceRef.current = 0;
     setCurrentSpeedKmh(0);
+    setSelectedDestination(null);
     return completed;
   }, [stopTracking, updateUser]);
 
@@ -599,8 +801,14 @@ export function AppProvider(
       currentSpeedKmh,
       speedFraudActive,
       trackingError,
+      selectedDestination,
+      setSelectedDestination,
+      requestLocationPermission,
       startRunSession,
+      pauseRunSession,
+      resumeRunSession,
       endRunSession,
+      addSessionPhoto,
       exchangeDistanceForCoupon,
       redeemMockCoupon,
       addMockDistance,
@@ -619,8 +827,14 @@ export function AppProvider(
       currentSpeedKmh,
       speedFraudActive,
       trackingError,
+      selectedDestination,
+      setSelectedDestination,
+      requestLocationPermission,
       startRunSession,
+      pauseRunSession,
+      resumeRunSession,
       endRunSession,
+      addSessionPhoto,
       exchangeDistanceForCoupon,
       redeemMockCoupon,
       addMockDistance,

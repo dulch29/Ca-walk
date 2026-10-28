@@ -1,7 +1,7 @@
 import type { Coordinates } from './mockData';
 
 export const STEP_LENGTH_METERS = 0.75;
-export const MAX_LEGIT_SPEED_KMH = 18;
+export const MAX_LEGIT_SPEED_KMH = 30; // Pace 2 min/km (~30 km/h) - Human sprint limit for anti-cheat
 export const MERCHANT_GEOFENCE_METERS = 50;
 
 const EARTH_RADIUS_METERS = 6371000;
@@ -35,16 +35,14 @@ export function calculatePace(
 ): string {
   const distance = nonNegative(distanceKm);
   const duration = nonNegative(durationSeconds);
-  if (distance === 0 || duration === 0) {
+  if (distance <= 0.005 || duration <= 0) {
     return '-- /km';
   }
-  const secondsPerKm = Math.round(duration / distance);
-  if (!Number.isFinite(secondsPerKm)) {
+  const minPerKm = duration / 60 / distance;
+  if (!Number.isFinite(minPerKm) || minPerKm <= 0 || minPerKm > 60) {
     return '-- /km';
   }
-  const minutes = Math.floor(secondsPerKm / 60);
-  const seconds = secondsPerKm % 60;
-  return `${minutes}'${String(seconds).padStart(2, '0')}" /km`;
+  return `${minPerKm.toFixed(2)} /km`;
 }
 
 export function calculateSpeedKmh(

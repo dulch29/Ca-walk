@@ -95,7 +95,7 @@ export default function RecordSummaryScreen({
           <View style={styles.statCol}>
             <Text style={styles.statLabel}>ก้าว</Text>
             <Text style={styles.statValue}>
-              {summary.steps > 0 ? summary.steps.toLocaleString() : '7,892'}
+              {summary.steps.toLocaleString()}
             </Text>
           </View>
           <View style={styles.statDivider} />
@@ -140,7 +140,7 @@ export default function RecordSummaryScreen({
               C
             </SvgText>
           </Svg>
-          <Text style={styles.coinsAmount}>+{coins > 0 ? coins : 52}</Text>
+          <Text style={styles.coinsAmount}>+{coins}</Text>
         </View>
       </View>
 

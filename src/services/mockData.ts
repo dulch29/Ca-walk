@@ -11,6 +11,9 @@ export interface RunSession {
   steps: number;
   distanceKm: number;
   averagePace: string;
+  destinationName?: string;
+  photos?: string[];
+  trackCoordinates?: Array<[number, number]>;
 }
 
 export interface MerchantMetrics {

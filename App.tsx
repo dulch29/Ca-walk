@@ -30,7 +30,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ActivityHistoryScreen from './src/screens/ActivityHistoryScreen';
 import ActivityDetailScreen from './src/screens/ActivityDetailScreen';
 import CouponHistoryScreen from './src/screens/CouponHistoryScreen';
-import { AppProvider } from './src/context/AppContext';
+import { AppProvider, useAppContext } from './src/context/AppContext';
 import { colors } from './src/theme';
 
 type RootStack = {
@@ -226,6 +226,9 @@ const MapRoute = ({ navigation }: Props<'Map'>) => (
   <MapScreen
     onBack={navigation.goBack}
     onOpenStore={storeId => navigation.navigate('Store', { storeId })}
+    onStartRecord={() => {
+      navigation.navigate('Main', { screen: 'Record' } as any);
+    }}
   />
 );
 const StoreRoute = ({ navigation, route }: Props<'Store'>) => (
@@ -285,19 +288,23 @@ const RecordSummaryRoute = ({ navigation, route }: Props<'RecordSummary'>) => (
 const RecordStoryRoute = ({ navigation, route }: Props<'RecordStory'>) => (
   <RecordStoryScreen
     summary={route.params.summary}
-    photoUri={lastPhotoUri}
+    photoUri={route.params.summary.photos?.[0] ?? lastPhotoUri}
     onClose={navigation.goBack}
   />
 );
-const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => (
-  <RecordCameraScreen
-    onBack={navigation.goBack}
-    onCaptured={uri => {
-      lastPhotoUri = uri;
-      navigation.goBack();
-    }}
-  />
-);
+const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => {
+  const { addSessionPhoto } = useAppContext();
+  return (
+    <RecordCameraScreen
+      onBack={navigation.goBack}
+      onCaptured={uri => {
+        lastPhotoUri = uri;
+        addSessionPhoto(uri);
+        navigation.goBack();
+      }}
+    />
+  );
+};
 const ProfileRoute = ({ navigation }: Props<'Profile'>) => (
   <ProfileEditScreen onBack={navigation.goBack} />
 );
