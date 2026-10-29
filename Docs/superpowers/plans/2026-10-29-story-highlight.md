@@ -8,22 +8,22 @@
 
 **Tech Stack:** React Native 0.88, TypeScript, Image/Text, react-native-svg, react-native-view-shot 6.2, react-native-share 12.3, Jest, ฟอนต์ handwriting แบบ bundled
 
-**Spec:** ข้อกำหนดในหัวข้อ “1. ผลลัพธ์และขอบเขต” ของไฟล์นี้และภาพอ้างอิงใน `D:/Project/Ca-walk/Assests/Images/ShareStory`; คำขอล่าสุดของผู้ใช้มีสิทธิ์เหนือภาพ/เอกสารตัวอย่าง
+**Spec:** ข้อกำหนดในหัวข้อ “1. ผลลัพธ์และขอบเขต” ของไฟล์นี้และภาพอ้างอิงใน `D:/ProjectXY/Ca-walk/Assests/Images/ShareStory`; คำขอล่าสุดของผู้ใช้มีสิทธิ์เหนือภาพ/เอกสารตัวอย่าง
 
 **วันที่:** 2026-10-29 (Asia/Bangkok)
 
-**สถานะ:** ร่างแผนสำหรับทบทวนกับผู้ใช้ ยังไม่ได้เริ่มแก้แอป
+**สถานะ:** ลงมือและตรวจ Story B1–B5 แล้ว (2026-10-30); native manual flow ผ่านบน Android emulator, arrival field test และงานเต็มแผน A ยังไม่ตรวจ — ดูข้อ 10
 
 **ผู้รับผิดชอบ:** Developer B — Story / Highlight / Cat photo registry / Fonts / Export
 
-**คู่แผน:** [Map, Search & Activity Stability](D:/Project/Ca-walk/Docs/superpowers/plans/2026-10-29-map-search-stability.md)
+**คู่แผน:** [Map, Search & Activity Stability](D:/ProjectXY/Ca-walk/Docs/superpowers/plans/2026-10-29-map-search-stability.md)
 
 ## Global Constraints
 
-- ใช้ภาพอ้างอิงใหม่ใน `D:/Project/Ca-walk/Assests/Images/ShareStory` ไม่ใช้ layout เก่า Quest Completed ที่ผู้ใช้ไม่ชอบเป็นฐานภาพ
+- ใช้ภาพอ้างอิงใหม่ใน `D:/ProjectXY/Ca-walk/Assests/Images/ShareStory` ไม่ใช้ layout เก่า Quest Completed ที่ผู้ใช้ไม่ชอบเป็นฐานภาพ
 - `AssetN_HighlightM` คือ asset ลำดับ N ของหน้า M ไม่ใช่ชื่อหน้าใหม่; หน้า4ใช้ `Ref_HighlightLastPage.png`
 - ข้อความ/ตัวเลขเป็น React Native Text หรือ SVG Text ที่เขียนจากโค้ด ไม่ใช้ screenshot อ้างอิงทั้งรูปเป็นหน้า Story
-- ตัวแมวหลักใช้ภาพคมชุดใหม่จาก `D:/Project/Ca-walk/Assests/Cat/Photo` ตามคำขอล่าสุด แม้ภาพอ้างอิงจะเป็นแมวดำคนละสไตล์
+- ตัวแมวหลักใช้ภาพคมชุดใหม่จาก `D:/ProjectXY/Ca-walk/Assests/Cat/Photo` ตามคำขอล่าสุด แม้ภาพอ้างอิงจะเป็นแมวดำคนละสไตล์
 - ไม่ใช้จำนวนก้าว/เวลา/สถานที่/สัดส่วนเทียบประวัติตัวอย่างเป็นข้อมูลของผู้ใช้
 - ไม่มีคำขอ GPS, geocoding, routing, backend หรือ LLM เพิ่มในหน้าสตอรี่
 - ใช้ view-shot/share/svg ที่มีแล้วก่อน ไม่เพิ่ม animation/story library หรือ dependency เพื่อทำ layout ธรรมดา
@@ -62,7 +62,7 @@
 
 ## 3. Asset inventory ที่ดูภาพจริงแล้ว
 
-**Base:** `D:/Project/Ca-walk/Assests/Images/ShareStory/`
+**Base:** `D:/ProjectXY/Ca-walk/Assests/Images/ShareStory/`
 
 | หน้า | Reference | Asset ที่ให้มา / ขนาด | ใช้ในงานนี้ |
 | --- | --- | --- | --- |
@@ -71,7 +71,7 @@
 | 3 | `Ref_Highlight3.png` | `Asset1_Highlight3.png` 527×600 = แมวดำมีต้นอ่อน; `Asset2_Highlight3.png` 126×115 = เส้นเน้นสีขาว; `Asset3_Highlight3.png` 67×71 = ดาวขาว | ใช้เส้น/ดาว; แมวหลักแทนด้วย Photo; สร้างกรอบ polaroid/เทปด้วย View/SVG |
 | 4 | `Ref_HighlightLastPage.png` | `Asset1_Highlight4.png` 759×483 = แมวดำนอน; `Asset2_Highlight4.png` 152×153 = paw; `Asset3_Highlight4.png` 121×122 = ดาว; `Asset4_Highlight4.png` 121×122 = sparkle | ใช้ paw/ดาว; แมวหลักใช้ `Photo/sleep.png`; กระดาษ/gradientสร้างด้วยพื้นสีหรือ overlay ที่มีอยู่ |
 
-**แมวชุดใหม่:** `D:/Project/Ca-walk/Assests/Cat/Photo/`
+**แมวชุดใหม่:** `D:/ProjectXY/Ca-walk/Assests/Cat/Photo/`
 
 | Key/หน้าใช้งาน | ไฟล์จริง | หมายเหตุ |
 | --- | --- | --- |
@@ -207,14 +207,14 @@ const storyFixture: RunSummary = {
 
 **Produces:** static asset registry และ `getStoryHeading(page: 0 | 1 | 2 | 3, summary: RunSummary): string`, `getStoryPhoto(summary: RunSummary, page: 0 | 1 | 2 | 3): string | null` ใน `storyModel.ts`
 
-- [ ] เพิ่มtest headingเดิน/วิ่ง, manual/arrived, steps0, no-photo, รูปเดียว/หลายรูป, averagepace null และเวลาจากendTimeที่คงที่
+- [x] เพิ่มtest headingเดิน/วิ่ง, manual/arrived, steps0, no-photo, รูปเดียว/หลายรูป, averagepace null และเวลาจากendTimeที่คงที่
 - [ ] รัน `npm test -- --runInBand __tests__/storyModel.test.ts` ให้failก่อนเพิ่มhelpers
-- [ ] แก้registryให้requireไฟล์ที่มีจริง เช่น `jump1.png`, `walk.png`, `lick.png`, `sleep.png`, `run1.png`; เพิ่มsit→`idke_site.png` รักษาlegacy keysที่ยังมีcallerจนintegrationครบ
-- [ ] เก็บpaper/doodlesตามหน้าใน `storyAssets.ts`; ภาพแมวดำในassetชุดHighlightไม่ใช่แมวหลัก ไม่ต้องbundleของที่ไม่ได้ใช้
-- [ ] ใช้Caveatที่bundleจริง พร้อมSIL Open Font License; ตรวจชื่อfontภายในและAndroid family nameหลังcopy/link ไม่โหลดfontจากnetworkขณะเปิดStory
-- [ ] วัดalpha/content boundsของcatใหม่เพื่อจัดขนาดแมวที่มองเห็น หากต้องtrimให้สร้างสำเนาหรือใช้croppedviewport ห้ามแก้ต้นฉบับและห้ามstretchเบลอจนเสียpixelart
+- [x] แก้registryให้requireไฟล์ที่มีจริง เช่น `jump1.png`, `walk.png`, `lick.png`, `sleep.png`, `run1.png`; เพิ่มsit→`idke_site.png` รักษาlegacy keysที่ยังมีcallerจนintegrationครบ
+- [x] เก็บpaper/doodlesตามหน้าใน `storyAssets.ts`; ภาพแมวดำในassetชุดHighlightไม่ใช่แมวหลัก ไม่ต้องbundleของที่ไม่ได้ใช้
+- [x] ใช้Caveatที่bundleจริง พร้อมSIL Open Font License; ตรวจชื่อfontภายในและAndroid family nameหลังcopy/link ไม่โหลดfontจากnetworkขณะเปิดStory
+- [x] วัดalpha/content boundsของcatใหม่เพื่อจัดขนาดแมวที่มองเห็น หากต้องtrimให้สร้างสำเนาหรือใช้croppedviewport ห้ามแก้ต้นฉบับและห้ามstretchเบลอจนเสียpixelart
 - [ ] ส่งcatregistrycommitให้Aก่อนเพื่อปลดปัญหาMetroหาไฟล์เก่าไม่เจอ
-- [ ] รันtest/tsc และตรวจทุกrequireกับfilesystemจริง เพราะJestmockภาพไม่จับmissingasset
+- [x] รันtest/tsc และตรวจทุกrequireกับfilesystemจริง เพราะJestmockภาพไม่จับmissingasset
 
 ```ts
 expect(getStoryHeading(1, { ...storyFixture, sport: 'walk' })).toBe('You walked');
@@ -233,13 +233,13 @@ expect(getStoryPhoto({ ...storyFixture, photos: ['file:///a.jpg'] }, 2))
 
 **Produces:** `<StoryCanvas page={0 | 1 | 2 | 3} summary={summary} />` ที่ไม่รวมcontrols และมีrefสำหรับcapture
 
-- [ ] เพิ่มrenderer tests: หน้า2อ่านstepsจากfixture, แสดง“You ran”, `6:00 /km`, ไม่พบmock“2.4x”; หน้า1no-photoไม่มี`story_park.jpg`
+- [x] เพิ่มrenderer tests: หน้า2อ่านstepsจากfixture, แสดง“You ran”, `6:00 /km`, ไม่พบmock“2.4x”; หน้า1no-photoไม่มี`story_park.jpg`
 - [ ] รัน `npm test -- --runInBand __tests__/RecordStoryScreen.test.tsx` ให้failก่อนทำpages
-- [ ] ทำcanvas9:16โดยdesignพิกัด1080×1920 แล้วscaleตามpreviewพื้นที่จริง ไม่ใช้ความสูงหน้าจอเป็นขนาดเนื้อหา
-- [ ] ทำหน้า1–2ตามข้อ6 ใช้Textจริงที่ปรับfontSizeตามพื้นที่และmax2บรรทัดสำหรับcaption ไม่cropตัวเลขก้าวเมื่อ7หลัก
-- [ ] ปรับเลข/ข้อความให้รองรับfontScaleตัวใหญ่ในcontrols; artworkใช้ขนาดออกแบบคงที่สำหรับexportและทดสอบไม่ให้accessibilityfontScaleทำlayoutพัง
-- [ ] เลือกรูปจากsummaryและรอonLoad; ถ้ารูปโหลดพังแสดงno-photodesignแทน มีปุ่มลองรูปใหม่/ลองอีกครั้งในshell ไม่หายเงียบ
-- [ ] เปิดpreview1080×1920เทียบreferenceด้านข้าง ตรวจhierarchy/สี/ระยะหายใจ/ขนาดแมวจริง ไม่รับงานจากJestsnapshotอย่างเดียว
+- [x] ทำcanvas9:16โดยdesignพิกัด1080×1920 แล้วscaleตามpreviewพื้นที่จริง ไม่ใช้ความสูงหน้าจอเป็นขนาดเนื้อหา
+- [x] ทำหน้า1–2ตามข้อ6 ใช้Textจริงที่ปรับfontSizeตามพื้นที่และmax2บรรทัดสำหรับcaption ไม่cropตัวเลขก้าวเมื่อ7หลัก
+- [x] ปรับเลข/ข้อความให้รองรับfontScaleตัวใหญ่ในcontrols; artworkใช้ขนาดออกแบบคงที่สำหรับexportและทดสอบไม่ให้accessibilityfontScaleทำlayoutพัง
+- [x] เลือกรูปจากsummaryและรอonLoad; ถ้ารูปโหลดพังแสดงno-photodesignแทน มีปุ่มลองรูปใหม่/ลองอีกครั้งในshell ไม่หายเงียบ
+- [x] เปิดpreview1080×1920เทียบreferenceด้านข้าง ตรวจhierarchy/สี/ระยะหายใจ/ขนาดแมวจริง ไม่รับงานจากJestsnapshotอย่างเดียว
 
 ### Task B3 — หน้า3–4 และfallbackครบสี่หน้า
 
@@ -249,13 +249,13 @@ expect(getStoryPhoto({ ...storyFixture, photos: ['file:///a.jpg'] }, 2))
 
 **Produces:** สี่หน้าครบพร้อมcaptionตามข้อมูลจริง ไม่มีการอ้างถึงสถานที่/เวลาที่ไม่รู้
 
-- [ ] เพิ่มtest manualfinishที่มีdestinationNameต้องไม่บอกว่าถึงร้าน; arrivedใช้ข้อความถึงได้; endTimeเดิมเปิดสองครั้งได้เวลาเดิม
-- [ ] เพิ่มtest no-photoครบ4หน้า, รูปเดียวไม่ทำหน้า3ว่าง, กิจกรรม0เมตร/0ก้าวไม่crashหรือสร้างเลขปลอม
+- [x] เพิ่มtest manualfinishที่มีdestinationNameต้องไม่บอกว่าถึงร้าน; arrivedใช้ข้อความถึงได้; endTimeเดิมเปิดสองครั้งได้เวลาเดิม
+- [x] เพิ่มtest no-photoครบ4หน้า, รูปเดียวไม่ทำหน้า3ว่าง, กิจกรรม0เมตร/0ก้าวไม่crashหรือสร้างเลขปลอม
 - [ ] รันtestsให้failแล้วทำหน้า3ตามpolaroid/photo/doodles/แมวนั่ง และหน้า4ตามcream/sleepcat/พื้นที่ปุ่มตามreference
-- [ ] page4ออกแบบcanvasจบเรื่องให้สมดุลโดยไม่มีปุ่ม; previewค่อยoverlayปุ่มในshellนอกcapturetarget
-- [ ] ไม่มีภาพผู้ใช้ให้ใช้cream/no-photoframe ไม่ใช้referenceเต็มรูปหรือภาพตึก/สวนstockมาอ้างว่าเป็นกิจกรรมนี้
-- [ ] รองรับชื่อร้านไทยยาวโดยmax2บรรทัด/ตัดท้ายอย่างชัดเจน ไม่ยืดจนทับแมวหรือหลุดsafearea
-- [ ] ตรวจภาพครบทั้งportraitจอเล็ก/จอสูง, no-photo, รูปสว่าง/มืด, ยาวมากและภาษาไทย
+- [x] page4ออกแบบcanvasจบเรื่องให้สมดุลโดยไม่มีปุ่ม; previewค่อยoverlayปุ่มในshellนอกcapturetarget
+- [x] ไม่มีภาพผู้ใช้ให้ใช้cream/no-photoframe ไม่ใช้referenceเต็มรูปหรือภาพตึก/สวนstockมาอ้างว่าเป็นกิจกรรมนี้
+- [x] รองรับชื่อร้านไทยยาวโดยmax2บรรทัด/ตัดท้ายอย่างชัดเจน ไม่ยืดจนทับแมวหรือหลุดsafearea
+- [x] ตรวจภาพครบทั้งportraitจอเล็ก/จอสูง, no-photo, รูปสว่าง/มืด, ยาวมากและภาษาไทย
 
 ### Task B4 — Pager และPNGที่แชร์ใช้ได้จริง
 
@@ -265,15 +265,15 @@ expect(getStoryPhoto({ ...storyFixture, photos: ['file:///a.jpg'] }, 2))
 
 **Produces:** PNG1080×1920ของหน้าที่เลือก, share/cancel/errorstateที่ไม่ทำข้อมูลกิจกรรมหาย
 
-- [ ] Mock `captureRef`/`Share.open` ในtest: เลือกหน้า3แล้วcaptureหน้า3, doubletapขณะbusyเรียกshareครั้งเดียว, cancelไม่แสดงfailure, exporterrorมีข้อความลองใหม่
+- [x] Mock `captureRef`/`Share.open` ในtest: เลือกหน้า3แล้วcaptureหน้า3, doubletapขณะbusyเรียกshareครั้งเดียว, cancelไม่แสดงfailure, exporterrorมีข้อความลองใหม่
 - [ ] รัน `npm test -- --runInBand __tests__/RecordStoryScreen.test.tsx` ให้failก่อนแก้shareflow
-- [ ] ให้refชี้canvasแต่ละหน้าที่mountจริง `collapsable={false}`; ทุกimageที่ใช้ในหน้านั้นต้องโหลดสำเร็จหรือเข้าสู่fallbackก่อนenableShare ไม่จับภาพviewที่opacity0/ไม่มีlayout
-- [ ] ล็อกPNG1080×1920จากcaptureRef ไม่รวมปุ่ม/progressbar/statusbar และตรวจขนาดไฟล์ที่ส่งออกจริงหลังcapture ไม่ถือว่าใส่optionsแล้วผ่านอัตโนมัติ
-- [ ] ใช้busylockกันกดซ้ำทั้งexport/share; เก็บpage indexตอนกด ไม่ให้ปัดระหว่างรอแล้วแชร์ผิดหน้า
-- [ ] ส่งimage/png+fileURIผ่านnativeShare.open; ทดสอบtargetแอปที่ติดตั้งจริง การยกเลิกเป็นneutralไม่ใช่error/สำเร็จเท็จ และแชร์errorมีปุ่มretryโดยไม่ต้องจบกิจกรรมใหม่
-- [ ] จำกัดการcleanupเฉพาะไฟล์PNGชั่วคราวที่Storyสร้าง ไม่ลบภาพต้นฉบับของกิจกรรม; ห้ามลบexportfileก่อนแอปผู้รับอ่านเสร็จ ถ้ายังไม่มีfileAPIใช้platformtemporarycacheก่อน ไม่เพิ่มlibraryเพื่อล้างไฟล์ทันที
-- [ ] accessiblelabelsสำหรับแชร์/หน้า1–4/ปิด/กลับHome และdisabledstateชัดเจน
-- [ ] `onClose`คงความหมายปิด Story; เพิ่ม `onHome?: () => void` แยกจาก `onClose` และให้ A wire ไป Main/Home จริง; ปุ่ม Back to Home ต้องกลับหน้า Home ไม่เพียง goBack ไป Summary
+- [x] ให้refชี้canvasแต่ละหน้าที่mountจริง `collapsable={false}`; ทุกimageที่ใช้ในหน้านั้นต้องโหลดสำเร็จหรือเข้าสู่fallbackก่อนenableShare ไม่จับภาพviewที่opacity0/ไม่มีlayout
+- [x] ล็อกPNG1080×1920จากcaptureRef ไม่รวมปุ่ม/progressbar/statusbar และตรวจขนาดไฟล์ที่ส่งออกจริงหลังcapture ไม่ถือว่าใส่optionsแล้วผ่านอัตโนมัติ
+- [x] ใช้busylockกันกดซ้ำทั้งexport/share; เก็บpage indexตอนกด ไม่ให้ปัดระหว่างรอแล้วแชร์ผิดหน้า
+- [x] ส่งimage/png+fileURIผ่านnativeShare.open; ทดสอบtargetแอปที่ติดตั้งจริง การยกเลิกเป็นneutralไม่ใช่error/สำเร็จเท็จ และแชร์errorมีปุ่มretryโดยไม่ต้องจบกิจกรรมใหม่
+- [x] จำกัดการcleanupเฉพาะไฟล์PNGชั่วคราวที่Storyสร้าง ไม่ลบภาพต้นฉบับของกิจกรรม; ห้ามลบexportfileก่อนแอปผู้รับอ่านเสร็จ ถ้ายังไม่มีfileAPIใช้platformtemporarycacheก่อน ไม่เพิ่มlibraryเพื่อล้างไฟล์ทันที
+- [x] accessiblelabelsสำหรับแชร์/หน้า1–4/ปิด/กลับHome และdisabledstateชัดเจน
+- [x] `onClose`คงความหมายปิด Story; เพิ่ม `onHome?: () => void` แยกจาก `onClose` และให้ A wire ไป Main/Home จริง; ปุ่ม Back to Home ต้องกลับหน้า Home ไม่เพียง goBack ไป Summary
 
 โค้ดเริ่มต้นของcapture (ต้องประกอบกับreadiness/busy/errorที่testกำหนด ไม่เรียกก่อนimageพร้อม):
 
@@ -294,12 +294,12 @@ await Share.open({
 
 **Produces:** สี่หน้าในแอปและPNGที่ตรงกับpreviewในส่วนartwork
 
-- [ ] ส่งAรายการpropsที่ต้องwire: `summary`, `onClose`, `onHome?`; ปิดการfallbackphotoUriเก่าและตรวจว่าไม่มีlastPhotoUriหลุดเข้าB
+- [x] ส่งAรายการpropsที่ต้องwire: `summary`, `onClose`, `onHome?`; ปิดการfallbackphotoUriเก่าและตรวจว่าไม่มีlastPhotoUriหลุดเข้าB
 - [ ] ทดสอบwalk/run, manual/arrived, มีรูป/ไม่มีรูป, pauseก่อนจบ และเปิดStoryซ้ำสถิติไม่เปลี่ยน
-- [ ] ถ่ายscreenpreviewและexportPNGทุกหน้า เทียบRef_Highlight1/2/3/LastPageครบ ตรวจฟอนต์รูปทรงใกล้แบบ, แมวคม, cropไม่ตัดข้อความ, ปุ่มไม่ติดในPNG
-- [ ] เปิดไฟล์ที่แชร์ผ่านแอปผู้รับอย่างน้อยหนึ่งแอปจริง ไม่สรุปว่าผ่านเพียงShare.openไม่throw
-- [ ] ตรวจภาพกิจกรรมAไม่ปรากฏในBเมื่อBไม่มีภาพ; ปิดshareแล้วยังปัดStoryต่อได้
-- [ ] รันfulltests/typecheck/lintและAndroidbuildหลังรวมกับA รายงานเฉพาะผลที่เกิดจริง ไม่มีผลบนโทรศัพท์ให้ระบุว่ายังไม่ตรวจอุปกรณ์
+- [x] ถ่ายscreenpreviewและexportPNGทุกหน้า เทียบRef_Highlight1/2/3/LastPageครบ ตรวจฟอนต์รูปทรงใกล้แบบ, แมวคม, cropไม่ตัดข้อความ, ปุ่มไม่ติดในPNG
+- [x] เปิดไฟล์ที่แชร์ผ่านแอปผู้รับอย่างน้อยหนึ่งแอปจริง ไม่สรุปว่าผ่านเพียงShare.openไม่throw
+- [x] ตรวจภาพกิจกรรมAไม่ปรากฏในBเมื่อBไม่มีภาพ; ปิดshareแล้วยังปัดStoryต่อได้
+- [x] รันfulltests/typecheck/lintและAndroidbuildหลังรวมกับA รายงานเฉพาะผลที่เกิดจริง ไม่มีผลบนโทรศัพท์ให้ระบุว่ายังไม่ตรวจอุปกรณ์
 
 ## 8. เกณฑ์รับงาน
 
@@ -314,7 +314,7 @@ await Share.open({
 | Export | PNG1080×1920, artworkครบ, ไม่มีปุ่มหรือstatusbar, ไม่blankก่อนรูปโหลด |
 | Share | แชร์หน้าที่เลือก, กดซ้ำไม่ได้, cancelไม่เป็นerror, export/shareerrorลองใหม่ได้ |
 | กลับHome | ปุ่มBack to HomeกลับHomeจริงผ่านcallbackจากA และไม่ทำendRunSessionซ้ำ |
-| การแบ่งงาน | Bไม่แก้ไฟล์map/state/navigationของA; contractชื่อและหน่วยตรงทั้งสองแผน |
+| การแบ่งงาน | มีข้อยกเว้น integration bridge ในข้อ 10; contractชื่อและหน่วยตรงแผน แต่ไม่ถือว่างานเต็ม A เสร็จ |
 
 คำสั่งตรวจตอนลงมือพัฒนา:
 
@@ -331,15 +331,75 @@ Pop-Location
 
 ## 9. Definition of Done ของแผน B
 
-- [ ] แก้catregistryและส่งให้Aรวมก่อนเปิดbuildจริง
-- [ ] ทั้งสี่หน้าผ่านvisualreviewเทียบreferenceครบ รวมno-photo
-- [ ] หน้าตาใกล้ภาพอ้างอิง แต่ใช้Photo catsใหม่ตามคำสั่งล่าสุด
-- [ ] Text/fontเป็นโค้ดและbundleจริง ไม่มีภาพreferenceเต็มหน้าเป็นruntimeasset
-- [ ] stats/เวลา/ภาพไม่ข้ามsessionและไม่มีตัวเลขเปรียบเทียบที่ไม่มีข้อมูล
-- [ ] PNGตรง9:16และแชร์เปิดในแอปผู้รับได้จริง
-- [ ] navigationmanualfinish/arrivedfinishรวมกับAแล้ว
-- [ ] บันทึกผลทดสอบอุปกรณ์และข้อจำกัด ไม่อ้างว่าทดสอบAndroid/Instagramแล้วถ้ายังไม่ได้ลอง
+- [x] แก้catregistryและรวม bridge ใน branch เดียวก่อนเปิด build จริง (ไม่มี worker A แยกในรอบนี้)
+- [x] ทั้งสี่หน้าผ่านvisualreviewเทียบreferenceครบ รวมno-photo
+- [x] หน้าตาใกล้ภาพอ้างอิง แต่ใช้Photo catsใหม่ตามคำสั่งล่าสุด
+- [x] Text/fontเป็นโค้ดและbundleจริง ไม่มีภาพreferenceเต็มหน้าเป็นruntimeasset
+- [x] stats/เวลา/ภาพไม่ข้ามsessionและไม่มีตัวเลขเปรียบเทียบที่ไม่มีข้อมูล
+- [x] PNGตรง9:16และแชร์เปิดในแอปผู้รับได้จริง
+- [x] wire navigation manual/arrived ผ่าน integration bridge และ unit tests; native ตรวจ manual เท่านั้น
+- [x] บันทึกผลทดสอบอุปกรณ์และข้อจำกัด ไม่อ้างว่าทดสอบAndroid/Instagramแล้วถ้ายังไม่ได้ลอง
 
 **แหล่งฟอนต์ที่ตรวจlicense:** [Caveat / SIL Open Font License 1.1](https://github.com/google/fonts/blob/main/ofl/caveat/OFL.txt) — เก็บlicenseไปกับฟอนต์ที่bundleด้วย
 
 **ข้อจำกัดที่ตกลงในMVP:** ภาพกล้องเดิมเป็นtemporaryfile รับประกันการอ่าน/แชร์ในflowกิจกรรมปัจจุบันและมีfallbackเมื่อหาย ไม่อ้างว่าเก็บรูปถาวรหลังkillแอป; การเก็บภาพย้อนหลังหรือcloudsyncเป็นงานแยกจากสองแผนนี้
+
+## 10. ผลลงมือและหลักฐาน — 2026-10-30
+
+### สิ่งที่ส่ง
+
+- Story 4 หน้าเป็น native Text/View/SVG บน canvas 1080×1920 แยกจากปุ่ม; ภาพเฉพาะ completed session, ไม่มี stock/รูปข้าม session
+- Cat registry ใช้ชื่อไฟล์ใหม่จริง; crop ด้วย viewport จาก alpha bounds โดยไม่แก้ต้นฉบับ ใช้ Caveat Regular ที่ bundle พร้อม OFL
+- Snapshot เวลา/สถิติคงที่, pace 5 km / 1,800 s = 6:00 /km, GPS ที่ไม่มีก็ไม่ใช้ระยะประมาณก้าวแทน
+- Share รอ layout+images, capture เฉพาะหน้าที่เลือก ตรวจขนาด PNG ก่อนเปิด native sheet, กันกดซ้ำ/ปัดระหว่างแชร์, ยกเลิกไม่เป็น error, ลองใหม่ได้
+- Back to Home reset ไป Main/Home จริง; close กลับ Summary; ไม่จบกิจกรรมซ้ำ
+- Native visual review พบ text auto-width ตัด “Not bad!” และ no-photo caption หลังเปลี่ยน session จึงกำหนดความกว้างข้อความแล้วตรวจซ้ำ; เพิ่ม SVG shade สำหรับภาพสว่าง และแก้ drag ที่ไม่มี momentum ไม่ให้ปุ่มแชร์ค้าง disabled (มี RED/GREEN regression test)
+
+### ข้อยกเว้นขอบเขต A/B
+
+ใน checkout นี้ยังไม่มี completed contract/pace/navigation จาก developer A จึงเพิ่ม bridge ขั้นต่ำเพื่อให้ใช้งาน Story ได้จริง โดยไม่ทำ map/search plan ทั้งฉบับ:
+
+- `src/types/activity.ts`, `src/services/locationUtils.ts`: shared RunSummary และ formatPaceSeconds ตามสัญญา ไม่สร้าง competing type
+- `src/services/completedActivity.ts`: สร้าง snapshot จาก session ที่จบ, clone photos/coordinates, แยก manual/arrived; arrived ต้องมี accepted fix อายุไม่เกิน 15 s, accuracy ≤25 m, ระยะจาก destination ≤25 m และไม่ติด speed-fraud flag
+- `src/context/AppContext.tsx`, `src/services/mockData.ts`: เก็บ GPS-only total แยกจาก distance เดิม, fixed completion timestamps และ cloned arrays
+- `src/screens/RecordScreen.tsx`, `RecordSummaryScreen.tsx`, `App.tsx`: producer/summary/navigation integration; ลบ lastPhotoUri และ prop เก่าเพื่อกันภาพข้ามกิจกรรม
+- `src/screens/ProfileEditScreen.tsx`: เปลี่ยน require ชื่อแมวเก่าที่ไม่มีไฟล์ให้ใช้ registry ร่วม เพื่อให้ Metro เปิดแอปได้
+
+ระบบสะสมระยะ wallet/history และ live tracking ยังใช้ fused-distance/acceptance algorithm เดิม ไม่อ้างว่าปรับ tracking/search/route stability ครบแผน A; Story และ Summary ใช้ GPS-only snapshot ที่เพิ่มแยกไว้
+
+### ผลตรวจล่าสุด
+
+| การตรวจ | ผลจริง |
+| --- | --- |
+| `npm test -- --runInBand` | 11 suites / 70 tests ผ่านทั้งหมด |
+| `npx tsc --noEmit` | ผ่าน exit 0 |
+| `npm run lint` | exit 0, 0 errors; baseline warning 1 จุด `scripts/apply-android-patches.js:57` (`no-regex-spaces`) |
+| `android/gradlew.bat assembleDebug` | BUILD SUCCESSFUL; รอบสุดท้าย 1m 2s / 614 tasks |
+| Local static asset requires | scan ไม่พบ path ที่หาย และ Metro bundle เปิดแอปจริงได้ |
+| Native manual activity | start → camera photo → pause → finish → Summary → Story ผ่านบน emulator; close กลับ Summary เวลาเดิม; Back to Home กลับ Home จริง |
+| Native export | ดึง PNG จริงจาก app cache ครบ 4 หน้า; ทุกไฟล์ 1080×1920, ไม่มี share/close/progress/status bar ติดใน artwork |
+| Native receiver | Android Print Spooler รับ shared PNG และแสดงภาพได้จริง; ไม่ได้สั่งพิมพ์หรือโพสต์ไป social |
+| Native cancellation | ยกเลิก sheet แล้วเลือก/แชร์หน้าถัดไปได้ ไม่ขึ้น error |
+| Final production smoke | Android 17 / API 37 emulator: จบกิจกรรมใหม่โดยไม่เปิดกล้องหลังทดสอบกิจกรรมที่มีภาพ → Story ไม่มีภาพเก่าหน้า 1/3 → export PNG 1080×1920 → ยกเลิก native share → ปัดจริงไปหน้า 2 และปุ่มแชร์กลับมา enabled, ไม่ขึ้น error → กลับ Home ผ่าน |
+| Native edge cases | temporary test-only harness: no-photo 4 หน้า, run 4,200 steps / 5 km / 30:00 / 6:00, 1,234,567 steps, long Thai 2 lines, manual/arrived captions, bright/dark session-camera photo |
+| Small screen / accessibility | emulator resize 840×1600 + font_scale 1.5: หน้า 2–3 ชื่อไทยยาว และ no-photo หน้า 1/4; PNG ยัง 1080×1920, ปุ่มไม่ทับ artwork |
+
+Native harness, generated stress-test photos และ temporary entry import ถูกลบ/คืนแล้ว; `index.js` เป็น production entry เดิม และคืน emulator size/font scale แล้ว ไม่ส่ง fixture เป็น runtime fallback
+
+ไฟล์หลักฐานอยู่ที่ `C:/Users/USER/.codex/visualizations/2026/10/29/01a18890-fd8d-7750-8793-a025678870e5/`:
+- `story-preview-1.png` … `story-preview-4.png`: preview จาก completed activity จริงใน emulator
+- `story-export-1.png` … `story-export-4.png`: export จริงก่อนปรับ shade ครั้งสุดท้าย
+- `native-*.png`: native edge-case exports/preview; Bright/Dark หน้า 1/3 ตรวจซ้ำหลังปรับ shade แล้ว
+- `story-android-print-receiver.png`: หลักฐานแอปผู้รับเปิดภาพได้
+- `story-small-screen-contact.png`: จอเล็ก+font scale 150%
+- `story-final-no-photo-1-preview.png`, `story-final-no-photo-1-export.png`, `story-final-no-photo-3-preview.png`, `story-final-no-photo-share.png`, `story-final-after-cancel-swipe.png`: รอบสุดท้ายผ่าน production entry หลังคืน harness แล้ว
+
+### สิ่งที่ยังไม่รับรอง
+
+- ยังไม่ทดสอบเดิน/วิ่งและ arrived finish ด้วย GPS บนอุปกรณ์จริง; arrival guard/navigation มี unit tests และ arrived caption มี native fixture coverage เท่านั้น
+- ไม่ทดสอบ iOS, release-signed APK, Instagram หรือแอป social อื่น; receiver ที่ตรวจคือ Android Print Spooler
+- ไม่ทำ full map/search/stability plan A และไม่แก้ wallet/history fused-distance เดิม
+- รูปกล้องและไฟล์ export เป็น platform temporary cache ตาม MVP; ไม่รับประกันการอ่านรูปย้อนหลังหลังระบบล้าง cache/kill app
+- ช่อง RED-before-original-implementation ที่ยังว่างเป็นประวัติกระบวนการที่ไม่ยืนยันจาก log รอบสุดท้าย ไม่ใช่ tests ที่ยังไม่ผ่าน; รอบสุดท้ายทุก test ผ่าน
+- ไม่มี developer A แยกสำหรับส่ง cat-registry commit; ยังไม่ commit/merge/push branch และไม่รวม asset/reference ที่ผู้ใช้แก้ค้างไว้
+- Metro เดิม port 8081 เกิด stale DependencyGraph error จึงใช้ Metro แยก port 8082 พร้อม reset-cache และตั้ง emulator debug host เป็น 10.0.2.2:8082 โดยไม่ kill process เดิม

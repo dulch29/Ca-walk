@@ -1,12 +1,11 @@
-/**
- * Cat photo assets from Assests/Cat/Photo
- */
-
+/** Original, unmodified pixel art. Legacy clean callers use the grooming pose. */
 export const CAT_PHOTOS = {
-  jump: require('../../Assests/Cat/Photo/jump (2).png'),
-  walk: require('../../Assests/Cat/Photo/walk (3).png'),
-  lick: require('../../Assests/Cat/Photo/lick (2).png'),
-  clean: require('../../Assests/Cat/Photo/clean (1).png'),
-  sleep: require('../../Assests/Cat/Photo/sleep (1).png'),
-  run: require('../../Assests/Cat/Photo/run (2).png'),
+  idle: require('../../Assests/Cat/Photo/idle.png'),
+  sit: require('../../Assests/Cat/Photo/idke_site.png'),
+  jump: require('../../Assests/Cat/Photo/jump1.png'),
+  walk: require('../../Assests/Cat/Photo/walk.png'),
+  lick: require('../../Assests/Cat/Photo/lick.png'),
+  clean: require('../../Assests/Cat/Photo/lick.png'),
+  sleep: require('../../Assests/Cat/Photo/sleep.png'),
+  run: require('../../Assests/Cat/Photo/run1.png'),
 };

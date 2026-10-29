@@ -20,7 +20,8 @@ import StoreDetailScreen from './src/screens/StoreDetailScreen';
 import DistanceWalletScreen from './src/screens/DistanceWalletScreen';
 import MissionsScreen from './src/screens/MissionsScreen';
 import MyCouponsScreen from './src/screens/MyCouponsScreen';
-import RecordScreen, { RunSummary } from './src/screens/RecordScreen';
+import RecordScreen from './src/screens/RecordScreen';
+import type { RunSummary } from './src/types/activity';
 import RecordSummaryScreen from './src/screens/RecordSummaryScreen';
 import RecordStoryScreen from './src/screens/RecordStoryScreen';
 import RecordCameraScreen from './src/screens/RecordCameraScreen';
@@ -58,9 +59,6 @@ type Nav = NativeStackNavigationProp<RootStack>;
 const Stack = createNativeStackNavigator<RootStack>();
 const Tab = createBottomTabNavigator();
 
-// shortcut: last quest photo kept in memory only, move to app state/storage when backend lands
-let lastPhotoUri: string | undefined;
-
 const ROUTE = {
   wallet: 'Wallet',
   missions: 'Missions',
@@ -86,7 +84,9 @@ function RecordTab() {
   return (
     <RecordScreen
       onBack={() => nav.navigate('Home' as any)}
-      onFinish={summary => nav.navigate('RecordSummary', { summary })}
+      onFinish={(summary, openStory) =>
+        nav.navigate(openStory ? 'RecordStory' : 'RecordSummary', { summary })
+      }
       onCamera={() => nav.navigate('RecordCamera')}
     />
   );
@@ -288,8 +288,8 @@ const RecordSummaryRoute = ({ navigation, route }: Props<'RecordSummary'>) => (
 const RecordStoryRoute = ({ navigation, route }: Props<'RecordStory'>) => (
   <RecordStoryScreen
     summary={route.params.summary}
-    photoUri={route.params.summary.photos?.[0] ?? lastPhotoUri}
     onClose={navigation.goBack}
+    onHome={() => navigation.reset({ index: 0, routes: [{ name: 'Main' }] })}
   />
 );
 const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => {
@@ -298,7 +298,6 @@ const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => {
     <RecordCameraScreen
       onBack={navigation.goBack}
       onCaptured={uri => {
-        lastPhotoUri = uri;
         addSessionPhoto(uri);
         navigation.goBack();
       }}

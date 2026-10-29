@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { profile } from '../data/meMock';
+import { CAT_PHOTOS } from '../assets/catPhotos';
 
 type Props = {
   onBack: () => void;
@@ -17,10 +18,10 @@ type Props = {
 
 // 4 distinct cat avatar variants matching the reference
 const AVATAR_OPTIONS = [
-  require('../../Assests/Cat/Photo/ide (1).png'),
-  require('../../Assests/Cat/Photo/walk (1).png'),
-  require('../../Assests/Cat/Photo/sleep (1).png'),
-  require('../../Assests/Cat/Photo/lick (1).png'),
+  CAT_PHOTOS.idle,
+  CAT_PHOTOS.walk,
+  CAT_PHOTOS.sleep,
+  CAT_PHOTOS.lick,
 ];
 
 const MAX_LEN = 20;

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -7,361 +7,289 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
-import Svg, { Path } from 'react-native-svg';
-import { CAT_PHOTOS } from '../assets/catPhotos';
-import { fmtPace, fmtTime, RunSummary, SPORT_LABEL } from './RecordScreen';
+import {
+  StoryCanvas,
+  type StoryCanvasStatus,
+} from '../components/story/StoryCanvas';
+import {
+  STORY_HEIGHT,
+  STORY_PAGES,
+  STORY_WIDTH,
+  type StoryPage,
+} from '../components/story/storyModel';
+import type { RunSummary } from '../types/activity';
 import { styles } from './RecordStoryScreen.styles';
 
-const STORY_PARK_IMG = require('../../Assests/Images/story_park.jpg');
-
 type Props = {
-  summary: RunSummary;
-  photoUri?: string;
+  summary: Readonly<RunSummary>;
   onClose: () => void;
+  onHome?: () => void;
+};
+const INITIAL_STATUS: StoryCanvasStatus = {
+  ready: false,
+  photoFailed: false,
+  assetFailed: false,
 };
 
-const SLIDES = 4;
+export default function RecordStoryScreen(props: Props) {
+  return <StoryPager key={props.summary.sessionId} {...props} />;
+}
 
-export default function RecordStoryScreen({
-  summary,
-  photoUri,
-  onClose,
-}: Props) {
-  const { width } = useWindowDimensions();
-  const [page, setPage] = useState(0);
+function StoryPager({ summary, onClose, onHome }: Props) {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [page, setPage] = useState<StoryPage>(0);
   const [busy, setBusy] = useState(false);
+  const busyLock = useRef(false);
+  const [paging, setPaging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [statuses, setStatuses] = useState(
+    STORY_PAGES.map(() => INITIAL_STATUS),
+  );
+  const [stageHeight, setStageHeight] = useState(
+    Math.max(1, height - insets.top - insets.bottom - 230),
+  );
   const slides = useRef<(React.ComponentRef<typeof View> | null)[]>([]);
-  const time = new Date().toTimeString().slice(0, 5);
-  const coins = Math.max(1, Math.floor(summary.km * 10));
+  const pager = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const previewWidth = Math.min(
+    width - 32,
+    (stageHeight * STORY_WIDTH) / STORY_HEIGHT,
+  );
+  const previewHeight = (previewWidth * STORY_HEIGHT) / STORY_WIDTH;
+  const scale = previewWidth / STORY_WIDTH;
+  const status = statuses[page];
+  const canShare = status.ready && !busy && !paging;
+
+  useEffect(() => {
+    pager.current?.scrollTo({ x: page * width, animated: false });
+  }, [width, page]);
+
+  const updateStatus = useCallback(
+    (index: StoryPage, next: StoryCanvasStatus) => {
+      setStatuses(previous => {
+        const current = previous[index];
+        if (
+          current.ready === next.ready &&
+          current.photoFailed === next.photoFailed &&
+          current.assetFailed === next.assetFailed
+        ) {
+          return previous;
+        }
+        return previous.map((item, i) => (i === index ? next : item));
+      });
+    },
+    [],
+  );
 
   const share = async () => {
+    if (busyLock.current || !canShare) {
+      return;
+    }
     const node = slides.current[page];
     if (!node) {
       return;
     }
+    busyLock.current = true;
     setBusy(true);
+    setError(null);
     try {
-      const uri = await captureRef(node, { format: 'png', quality: 1 });
+      const captured = await captureRef(node, {
+        format: 'png',
+        quality: 1,
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        result: 'tmpfile',
+      });
+      const uri = captured.startsWith('file://')
+        ? captured
+        : `file://${captured}`;
+      await new Promise<void>((resolve, reject) => {
+        Image.getSize(
+          uri,
+          (w, h) =>
+            w === STORY_WIDTH && h === STORY_HEIGHT
+              ? resolve()
+              : reject(new Error('Unexpected PNG dimensions')),
+          reject,
+        );
+      });
       await Share.open({
         url: uri,
         type: 'image/png',
         title: 'Ca-Walk Story',
-        message: `วันนี้ฉันเดินไป ${summary.km.toFixed(2)} km (${summary.steps.toLocaleString()} ก้าว) กับ Ca-Walk! 🐾`,
+        failOnCancel: false,
       });
     } catch {
-      // User dismissed share dialog or share failed non-critically
+      setError('แชร์ไม่สำเร็จ ลองอีกครั้ง');
     } finally {
+      busyLock.current = false;
       setBusy(false);
     }
   };
 
-  const polaroidPhoto = (
-    <View style={styles.polaroidImageContainer}>
-      <Image
-        source={photoUri ? { uri: photoUri } : STORY_PARK_IMG}
-        style={styles.polaroidImage}
-        resizeMode="cover"
-        accessibilityLabel="ภาพถ่ายกิจกรรม"
-      />
-    </View>
-  );
-
-  const slideWrapper = (i: number, children: React.ReactNode) => (
-    <View key={i} style={[{ width }, styles.slideWrapper]}>
-      <View
-        ref={(r) => {
-          slides.current[i] = r;
-        }}
-        collapsable={false}
-        style={styles.slideCard}
-      >
-        {children}
-      </View>
-    </View>
-  );
+  const retryImages = () => {
+    if (busyLock.current) {
+      return;
+    }
+    setStatuses(STORY_PAGES.map(() => INITIAL_STATUS));
+    setAttempt(previous => previous + 1);
+    setError(null);
+  };
 
   return (
-    <View style={styles.root}>
-      {/* Top Indicators */}
+    <View
+      style={[
+        styles.root,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
       <View style={styles.topBar}>
         <View style={styles.bars}>
-          {Array.from({ length: SLIDES }, (_, i) => (
-            <View key={i} style={[styles.bar, i <= page && styles.barOn]} />
+          {STORY_PAGES.map(index => (
+            <Pressable
+              key={index}
+              style={styles.pageButton}
+              onPress={() => {
+                if (!busyLock.current) {
+                  setPage(index);
+                  setPaging(false);
+                }
+              }}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`หน้า Story ${index + 1} จาก 4`}
+              accessibilityState={{ selected: page === index, disabled: busy }}
+            >
+              <View style={[styles.bar, index <= page && styles.barOn]} />
+            </Pressable>
           ))}
         </View>
-      </View>
-
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) =>
-          setPage(Math.round(e.nativeEvent.contentOffset.x / width))
-        }
-      >
-        {/* Slide 0: Quest Completed! */}
-        {slideWrapper(
-          0,
-          <>
-            <View style={styles.questHeaderRow}>
-              <Text style={styles.questHeaderTitle}>Quest Completed!</Text>
-              <View style={styles.questCheckCircle}>
-                <Svg
-                  width={14}
-                  height={14}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#FFFFFF"
-                  strokeWidth={3}
-                >
-                  <Path
-                    d="M20 6L9 17l-5-5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </Svg>
-              </View>
-            </View>
-
-            <View style={styles.questCatRow}>
-              <Image
-                source={CAT_PHOTOS.jump}
-                style={styles.catPhotoSmall}
-                accessibilityLabel="รูปแมวกระโดดดีใจ"
-              />
-              <View style={styles.questSpeechBubble}>
-                <Text style={styles.questSpeechText}>
-                  ภารกิจสำเร็จแล้ว เยี่ยมมาก! ♥
-                </Text>
-              </View>
-            </View>
-
-            {/* Main Quest Box with Genuine Stats */}
-            <View style={styles.mainProgressCard}>
-              <View style={styles.mainProgressTop}>
-                <Text style={styles.mainProgressLabel}>
-                  {SPORT_LABEL[summary.sport]} {summary.km.toFixed(2)} km
-                </Text>
-                <View style={styles.rewardBadge}>
-                  <Text style={styles.rewardBadgeText}>+{coins} เหรียญ</Text>
-                </View>
-              </View>
-              <View style={styles.progressBarTrack}>
-                <View style={styles.progressBarFill} />
-              </View>
-            </View>
-
-            {/* Daily Activity Checklist */}
-            <View style={styles.checklistSection}>
-              <Text style={styles.checklistTitle}>บันทึกกิจกรรมจริง</Text>
-
-              <View style={styles.checklistItem}>
-                <View style={styles.checkItemLeft}>
-                  <Text>📏</Text>
-                  <Text style={styles.checkItemText}>
-                    ระยะทาง {summary.km.toFixed(2)} km
-                  </Text>
-                </View>
-                <Text style={styles.checkItemReward}>
-                  {fmtTime(summary.seconds)}
-                </Text>
-              </View>
-
-              <View style={styles.checklistItem}>
-                <View style={styles.checkItemLeft}>
-                  <Text>👟</Text>
-                  <Text style={styles.checkItemText}>
-                    จำนวนก้าว {summary.steps.toLocaleString()} ก้าว
-                  </Text>
-                </View>
-                <Text style={styles.checkItemReward}>
-                  {fmtPace(summary.seconds, summary.km)}
-                </Text>
-              </View>
-
-              <View style={styles.checklistItem}>
-                <View style={styles.checkItemLeft}>
-                  <Text>📍</Text>
-                  <Text style={styles.checkItemText} numberOfLines={1}>
-                    {summary.destinationName
-                      ? `ปลายทาง: ${summary.destinationName}`
-                      : 'กิจกรรมทั่วไป'}
-                  </Text>
-                </View>
-                <Text style={styles.checkItemReward}>🪙 +{coins}</Text>
-              </View>
-            </View>
-
-            <View style={styles.questFooterRow}>
-              <Image
-                source={CAT_PHOTOS.walk}
-                style={styles.catPhotoSmall}
-                accessibilityLabel="รูปแมวเดิน"
-              />
-              <Text style={styles.questFooterText}>
-                Another step closer to your goal! ♥
-              </Text>
-            </View>
-          </>,
-        )}
-
-        {/* Slide 1: Polaroid + Real Metrics */}
-        {slideWrapper(
-          1,
-          <>
-            <Text style={styles.polaroidHeaderTitle}>
-              Good steps,{'\n'}Great journey 🐾
-            </Text>
-
-            <View style={styles.polaroidCard}>
-              <View style={styles.washiTape} />
-              {polaroidPhoto}
-              <Text style={styles.polaroidCaption} numberOfLines={1}>
-                {summary.destinationName
-                  ? `ปลายทาง: ${summary.destinationName}`
-                  : 'Good vibes Good steps 🐾'}
-              </Text>
-            </View>
-
-            <View style={styles.statRowsSection}>
-              <View style={styles.statRowItem}>
-                <View style={styles.statRowLeft}>
-                  <Text style={styles.statRowIcon}>👟</Text>
-                  <Text style={styles.statRowValue}>
-                    {summary.steps.toLocaleString()}
-                  </Text>
-                  <Text style={styles.statRowSub}>steps</Text>
-                </View>
-                <Text style={styles.statRowTrend}>✓ สำเร็จ</Text>
-              </View>
-
-              <View style={styles.statRowItem}>
-                <View style={styles.statRowLeft}>
-                  <Text style={styles.statRowIcon}>📏</Text>
-                  <Text style={styles.statRowValue}>
-                    {summary.km.toFixed(2)} km
-                  </Text>
-                  <Text style={styles.statRowSub}>distance</Text>
-                </View>
-                <Text style={styles.statRowTrend}>✓ GPS จริง</Text>
-              </View>
-
-              <View style={styles.statRowItem}>
-                <View style={styles.statRowLeft}>
-                  <Text style={styles.statRowIcon}>⏱️</Text>
-                  <Text style={styles.statRowValue}>
-                    {fmtPace(summary.seconds, summary.km)}
-                  </Text>
-                  <Text style={styles.statRowSub}>pace</Text>
-                </View>
-                <Text style={styles.statRowTrend}>
-                  {fmtTime(summary.seconds)}
-                </Text>
-              </View>
-            </View>
-          </>,
-        )}
-
-        {/* Slide 2: Huge Steps Highlight */}
-        {slideWrapper(
-          2,
-          <>
-            <Text style={styles.hugeStepsSubtitle}>You walked</Text>
-            <Text style={styles.hugeStepsNumber}>
-              {summary.steps.toLocaleString()} 🐾
-            </Text>
-            <Text style={styles.hugeStepsSubtitle}>steps.</Text>
-
-            <View style={styles.speechBubbleCenter}>
-              <Text style={styles.speechBubbleCenterText}>
-                เก่งมากเลย วันนี้! ♥
-              </Text>
-            </View>
-
-            <Image
-              source={CAT_PHOTOS.walk}
-              style={styles.catPhotoLarge}
-              accessibilityLabel="รูปแมวเดินขนาดใหญ่"
-            />
-
-            <View style={styles.keepGoingBox}>
-              <Text style={styles.keepGoingText}>
-                {summary.km.toFixed(2)} km ใน {fmtTime(summary.seconds)}
-                {'\n'}Keep going, you're doing great! 🐾
-              </Text>
-            </View>
-
-            <View style={styles.botanicalFoliage}>
-              <Text style={styles.foliageEmoji}>🌿 🌱 🌿 🌱 🌿</Text>
-            </View>
-          </>,
-        )}
-
-        {/* Slide 3: Polaroid Postcard (Small steps Big rewards) */}
-        {slideWrapper(
-          3,
-          <>
-            <Text style={styles.polaroidHeaderTitle}>
-              Small steps{'\n'}Big rewards 🐾
-            </Text>
-
-            <View style={styles.polaroidCard}>
-              <View style={styles.washiTape} />
-              {polaroidPhoto}
-              <Text style={styles.polaroidCaption} numberOfLines={1}>
-                {summary.destinationName
-                  ? `ปลายทาง ${summary.destinationName}`
-                  : "Today's walk 🐾"}
-              </Text>
-            </View>
-
-            <View style={styles.polaroidMetaRow}>
-              <Text style={styles.polaroidMetaItem} numberOfLines={1}>
-                📍 {summary.destinationName ?? 'กิจกรรมเดิน/วิ่ง'}
-              </Text>
-              <Text style={styles.polaroidMetaItem}>🕒 {time}</Text>
-            </View>
-
-            <View style={styles.storyCatCenter}>
-              <Image
-                source={CAT_PHOTOS.clean}
-                style={styles.catPhotoMedium}
-                accessibilityLabel="รูปแมวเลียขนมีความสุข"
-              />
-            </View>
-
-            <View style={styles.botanicalFoliageSpaced}>
-              <Text style={styles.foliageEmoji}>🌿 🌱 🌾 🌱 🌿</Text>
-            </View>
-          </>,
-        )}
-      </ScrollView>
-
-      {/* Bottom Actions */}
-      <View style={styles.actions}>
         <Pressable
-          style={styles.ghostBtn}
           onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="ปิดหน้า Story"
-        >
-          <Text style={styles.ghostBtnText}>ปิด</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.shareBtn}
-          onPress={share}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="แชร์ภาพกิจกรรม"
+          accessibilityLabel="ปิดหน้า Story"
           accessibilityState={{ disabled: busy }}
+          style={styles.closeButton}
         >
-          <Text style={styles.shareBtnText}>
-            {busy ? 'กำลังเตรียม...' : 'แชร์ Story'}
+          <Text style={styles.closeText}>×</Text>
+        </Pressable>
+      </View>
+      <View
+        style={styles.stage}
+        onLayout={event => setStageHeight(event.nativeEvent.layout.height)}
+      >
+        <ScrollView
+          ref={pager}
+          horizontal
+          pagingEnabled
+          scrollEnabled={!busy}
+          showsHorizontalScrollIndicator={false}
+          removeClippedSubviews={false}
+          onScrollBeginDrag={() => setPaging(true)}
+          onScrollEndDrag={event => {
+            const x = event.nativeEvent.contentOffset.x;
+            if (Math.abs(x - Math.round(x / width) * width) < 1) {
+              setPage(STORY_PAGES[Math.round(x / width)] ?? 0);
+              setPaging(false);
+            }
+          }}
+          onMomentumScrollBegin={() => setPaging(true)}
+          onMomentumScrollEnd={event => {
+            if (!busyLock.current) {
+              setPage(
+                STORY_PAGES[
+                  Math.round(event.nativeEvent.contentOffset.x / width)
+                ] ?? 0,
+              );
+              setPaging(false);
+            }
+          }}
+        >
+          {STORY_PAGES.map(index => (
+            <View key={index} style={[styles.slide, { width }]}>
+              <View
+                style={[
+                  styles.preview,
+                  { width: previewWidth, height: previewHeight },
+                ]}
+              >
+                <View style={[styles.scaledCanvas, { transform: [{ scale }] }]}>
+                  <StoryCanvas
+                    key={`${summary.sessionId}:${attempt}:${index}`}
+                    ref={node => {
+                      slides.current[index] = node;
+                    }}
+                    page={index}
+                    summary={summary}
+                    onStatusChange={next => updateStatus(index, next)}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+      <View style={styles.actions}>
+        {error && (
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={styles.error}
+          >
+            {error}
+          </Text>
+        )}
+        {(status.photoFailed || status.assetFailed) && (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>
+              {status.assetFailed
+                ? 'โหลดภาพตกแต่งไม่สำเร็จ'
+                : 'บางรูปโหลดไม่ได้ ใช้รูปที่เหลือหรือพื้นกระดาษแทน'}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="ลองโหลดรูปอีกครั้ง"
+              onPress={retryImages}
+              disabled={busy}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>ลองโหลดรูปอีกครั้ง</Text>
+            </Pressable>
+          </View>
+        )}
+        <Pressable
+          style={[styles.shareButton, !canShare && styles.disabled]}
+          onPress={share}
+          disabled={!canShare}
+          accessibilityRole="button"
+          accessibilityLabel="แชร์ภาพกิจกรรม"
+          accessibilityState={{ disabled: !canShare, busy }}
+        >
+          <Text style={styles.shareText}>
+            {busy
+              ? 'กำลังเตรียมภาพ…'
+              : !status.ready
+              ? 'กำลังโหลดภาพ…'
+              : 'Share this story'}
           </Text>
         </Pressable>
+        {onHome && (
+          <Pressable
+            style={styles.homeButton}
+            onPress={onHome}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="กลับหน้า Home"
+            accessibilityState={{ disabled: busy }}
+          >
+            <Text style={styles.homeText}>Back to Home</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );

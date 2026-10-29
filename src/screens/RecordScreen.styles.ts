@@ -630,4 +630,10 @@ export const styles = StyleSheet.create({
     color: '#92400E',
     fontWeight: '700',
   },
+  arrivalStoryButton: {
+    minHeight: 48, padding: 12, marginBottom: 12, borderRadius: 24,
+    backgroundColor: '#374B2A', alignItems: 'center', justifyContent: 'center',
+  },
+  arrivalStoryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center' },
+
 });

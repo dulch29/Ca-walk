@@ -11,6 +11,7 @@ export interface RunSession {
   steps: number;
   distanceKm: number;
   averagePace: string;
+  gpsDistanceKm?: number;
   destinationName?: string;
   photos?: string[];
   trackCoordinates?: Array<[number, number]>;

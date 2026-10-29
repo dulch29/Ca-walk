@@ -103,3 +103,11 @@ export function isWithinGeofence(
       : MERCHANT_GEOFENCE_METERS;
   return haversineDistanceMeters(userLocation, merchantLocation) <= radius;
 }
+
+export function formatPaceSeconds(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value <= 0) {
+    return '--';
+  }
+  const seconds = Math.round(value);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}

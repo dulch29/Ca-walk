@@ -54,6 +54,8 @@ export interface ActiveRunSession {
   startTime: string;
   steps: number;
   distanceKm: number;
+  gpsDistanceKm: number;
+  lastAcceptedLocation?: TrackedLocation;
   currentPace: string;
   durationSeconds: number;
   status: 'recording' | 'paused';
@@ -251,6 +253,11 @@ export function AppProvider(
 
         // Deadband filter: ignore micro-movements < 2.5 meters to prevent stationary jitter/drift
         if (segmentDistanceMeters < 2.5) {
+          if (!isSpeedFraud(location.speedKmh ?? 0)) {
+            updateActiveSession(current =>
+              current ? { ...current, lastAcceptedLocation: location } : current,
+            );
+          }
           return;
         }
 
@@ -294,10 +301,11 @@ export function AppProvider(
           return {
             ...current,
             trackCoordinates: [coord],
+            lastAcceptedLocation: location,
           };
         }
         if (segmentDistanceKm <= 0) {
-          return current;
+          return { ...current, lastAcceptedLocation: location };
         }
 
         const nextGpsDist = roundDistance(current.distanceKm + segmentDistanceKm);
@@ -314,6 +322,8 @@ export function AppProvider(
         return {
           ...current,
           distanceKm,
+          gpsDistanceKm: current.gpsDistanceKm + segmentDistanceKm,
+          lastAcceptedLocation: location,
           trackCoordinates: newTrack,
           currentPace: calculatePace(distanceKm, current.durationSeconds),
         };
@@ -387,6 +397,7 @@ export function AppProvider(
         startTime,
         steps: 0,
         distanceKm: 0,
+        gpsDistanceKm: 0,
         currentPace: '-- /km',
         durationSeconds: 0,
         status: 'recording',
@@ -536,10 +547,11 @@ export function AppProvider(
       durationSeconds,
       steps: current.steps,
       distanceKm,
+      gpsDistanceKm: current.gpsDistanceKm,
       averagePace: calculatePace(distanceKm, durationSeconds),
       destinationName: current.destination?.name,
-      photos: current.photos,
-      trackCoordinates: current.trackCoordinates,
+      photos: [...current.photos],
+      trackCoordinates: current.trackCoordinates.map(([lng, lat]) => [lng, lat]),
     };
     const newRunHistory = [...runHistoryRef.current, completed];
     runHistoryRef.current = newRunHistory;

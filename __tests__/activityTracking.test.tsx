@@ -293,3 +293,32 @@ describe('Activity Tracking Lifecycle in AppContext', () => {
     expect(mockStopped).toBe(true);
   });
 });
+
+
+it('keeps GPS-only distance separate from fused steps and ignores paused gaps', async () => {
+  jest.useFakeTimers();
+  let ctx!: AppContextValue;
+  let tree!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => { tree = ReactTestRenderer.create(<AppProvider><Consumer onRender={c => {ctx = c;}} /></AppProvider>); });
+  await ReactTestRenderer.act(async () => { await ctx.startRunSession(); });
+  ReactTestRenderer.act(() => {
+    for (let i = 0; i < 200; i++) {mockOnStep?.();}
+  });
+  expect(ctx.activeSession?.gpsDistanceKm).toBe(0);
+  ReactTestRenderer.act(() => {
+    mockOnLocation?.({latitude: 13.738, longitude: 100.5235, accuracy: 8, timestamp: 10000, speedKmh: 4});
+    mockOnLocation?.({latitude: 13.73808, longitude: 100.52358, accuracy: 8, timestamp: 15000, speedKmh: 4});
+  });
+  const gps = ctx.activeSession!.gpsDistanceKm;
+  expect(gps).toBeGreaterThan(0.01);
+  expect(gps).toBeLessThan(0.02);
+  ReactTestRenderer.act(() => {ctx.pauseRunSession();ctx.resumeRunSession();
+    mockOnLocation?.({latitude: 13.75, longitude: 100.54, accuracy: 8, timestamp: 30000, speedKmh: 4});
+  });
+  expect(ctx.activeSession?.gpsDistanceKm).toBe(gps);
+  let result: ReturnType<AppContextValue['endRunSession']>;
+  ReactTestRenderer.act(() => {result = ctx.endRunSession();});
+  expect(result!.gpsDistanceKm).toBe(gps);
+  ReactTestRenderer.act(() => tree.unmount());
+  jest.useRealTimers();
+});
