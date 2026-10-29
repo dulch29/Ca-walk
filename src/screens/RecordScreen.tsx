@@ -24,21 +24,18 @@ import { formatDistance } from '../services/osmLocationService';
 
 const MAP_FALLBACK_BG = require('../../Assests/Images/record_map.jpg');
 
-export type Sport = 'walk' | 'run';
-export type RunSummary = {
-  sport: Sport;
-  seconds: number;
-  km: number;
-  steps: number;
-  destinationName?: string;
-  photos?: string[];
-};
+import type { RunSummary, Sport } from '../types/activity';
+import {
+  canFinishAtDestination,
+  createRunSummary,
+} from '../services/completedActivity';
+export type { RunSummary, Sport } from '../types/activity';
 
 type Phase = 'idle' | 'pick' | 'ready' | 'recording' | 'paused';
 
 type Props = {
   onBack?: () => void;
-  onFinish: (summary: RunSummary) => void;
+  onFinish: (summary: RunSummary, openStory?: boolean) => void;
   onCamera: () => void;
 };
 
@@ -336,22 +333,24 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
     cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
   };
 
-  const handleFinish = () => {
+  const canFinishArrived =
+    !speedFraudActive && canFinishAtDestination(activeSession);
+  const handleFinish = (reason: RunSummary['completionReason'] = 'manual') => {
+    if (
+      reason === 'arrived' &&
+      (speedFraudActive || !canFinishAtDestination(activeSession))
+    ) {
+      Alert.alert(
+        'ยังยืนยันจุดหมายไม่ได้',
+        'รอสัญญาณ GPS ใกล้จุดหมาย แล้วลองอีกครั้ง',
+      );
+      return;
+    }
     const completed = endRunSession();
-    const finalSeconds = completed?.durationSeconds ?? seconds;
-    const finalKm = completed?.distanceKm ?? km;
-    const finalSteps = completed?.steps ?? steps;
-    const destName = completed?.destinationName ?? activeDestination?.name;
-    const photos = completed?.photos ?? activeSession?.photos ?? [];
-
-    onFinish({
-      sport,
-      seconds: finalSeconds,
-      km: finalKm,
-      steps: finalSteps,
-      destinationName: destName,
-      photos,
-    });
+    if (!completed) {
+      return;
+    }
+    onFinish(createRunSummary(completed, sport, reason), reason === 'arrived');
     setLocalPhase('ready');
   };
 
@@ -833,6 +832,19 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
           </View>
         )}
 
+        {active && canFinishArrived && (
+          <Pressable
+            onPress={() => handleFinish('arrived')}
+            accessibilityRole="button"
+            accessibilityLabel="จบและสร้างสตอรี่"
+            style={styles.arrivalStoryButton}
+          >
+            <Text style={styles.arrivalStoryText}>
+              ถึงจุดหมายแล้ว · จบและสร้างสตอรี่
+            </Text>
+          </Pressable>
+        )}
+
         {/* Phase: Recording Active */}
         {phase === 'recording' && (
           <View style={styles.recordingControlsRow}>
@@ -878,7 +890,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             {/* Left: Finish (Stop) */}
             <View style={styles.controlBtnCol}>
               <Pressable
-                onPress={handleFinish}
+                onPress={() => handleFinish()}
                 accessibilityRole="button"
                 accessibilityLabel="จบกิจกรรม"
                 style={styles.stopCircleBtn}

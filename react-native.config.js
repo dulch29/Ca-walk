@@ -1,3 +1,2 @@
-// react-native-sensors is patched by scripts/apply-android-patches.js before autolinking.
-// Firebase/Auth/Firestore, Google Sign-In, sensors, and camera must stay native-autolinked.
-module.exports = {};
+// Keep existing native modules autolinked. Story fonts are bundled offline.
+module.exports = { assets: ['./Assests/Fonts/'] };
