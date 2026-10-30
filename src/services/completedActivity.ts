@@ -1,7 +1,7 @@
 import type { ActiveRunSession } from '../context/AppContext';
 import type { RunSession } from './mockData';
 import type { RunSummary, Sport } from '../types/activity';
-import { isWithinGeofence } from './locationUtils';
+import { isWithinGeofence, MAX_LOCATION_AGE_MS } from './locationUtils';
 
 export function createRunSummary(
   completed: RunSession,
@@ -28,10 +28,13 @@ export function createRunSummary(
     completionReason,
     destinationName: completed.destinationName,
     photos: [...(completed.photos ?? [])],
-    trackCoordinates: (completed.trackCoordinates ?? []).map(([lng, lat]) => [
-      lng,
-      lat,
-    ]),
+    photoLocations: { ...(completed.photoLocations ?? {}) },
+    trackCoordinates: (completed.trackCoordinates ?? []).map(
+      ([lng, lat]): [number, number] => [lng, lat],
+    ),
+    trackSegments: (completed.trackSegments ?? []).map(segment =>
+      segment.map(([lng, lat]): [number, number] => [lng, lat]),
+    ),
   };
 }
 
@@ -50,7 +53,7 @@ export function canFinishAtDestination(
     fix.accuracy < 0 ||
     fix.accuracy > 25 ||
     now - fix.timestamp < 0 ||
-    now - fix.timestamp > 15000
+    now - fix.timestamp > MAX_LOCATION_AGE_MS
   ) {
     return false;
   }

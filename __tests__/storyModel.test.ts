@@ -21,17 +21,31 @@ it('uses the completed sport and real steps, including zero', () => {
   });
 });
 
-it('never claims arrival from a destination name alone', () => {
-  const summary = { ...storyFixture, destinationName: 'ร้านกาแฟของเรา' };
+it('uses the displayed photo location instead of its destination', () => {
+  const summary = {
+    ...storyFixture,
+    destinationName: 'ร้านกาแฟปลายทาง',
+    photos: ['file:///first.jpg', 'file:///queen-sirikit.jpg'],
+    photoLocations: {
+      'file:///first.jpg': 'สวนลุมพินี',
+      'file:///queen-sirikit.jpg': 'สวนสิริกิติ์',
+    },
+  };
+  const displayedPhoto = getStoryPhoto(summary, 2);
+
   expect(getStoryHeading(2, summary)).toBe('A moment from your run.');
-  expect(getStoryLocation(summary)).toBe('จุดหมาย: ร้านกาแฟของเรา');
-  expect(getStoryHeading(2, { ...summary, completionReason: 'arrived' })).toBe(
-    'Here’s where you went.',
+  expect(displayedPhoto).toBe('file:///queen-sirikit.jpg');
+  expect(getStoryLocation(summary, displayedPhoto)).toBe('สวนสิริกิติ์');
+  expect(
+    getStoryLocation(
+      { ...summary, photoLocations: {} },
+      displayedPhoto,
+    ),
+  ).toBe('ตำแหน่งที่ถ่ายรูป');
+  expect(getStoryLocation(summary, null)).toBe('เส้นทางของคุณ');
+  expect(getStoryLocation(summary, displayedPhoto)).not.toContain(
+    'ร้านกาแฟปลายทาง',
   );
-  expect(getStoryLocation({ ...summary, completionReason: 'arrived' })).toBe(
-    'ร้านกาแฟของเรา',
-  );
-  expect(getStoryLocation(storyFixture)).toBe('Your own route');
 });
 
 it('uses only session photos and chooses the second for the moment page', () => {

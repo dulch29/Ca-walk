@@ -3,6 +3,7 @@ import type { Coordinates } from './mockData';
 export const STEP_LENGTH_METERS = 0.75;
 export const MAX_LEGIT_SPEED_KMH = 30; // Pace 2 min/km (~30 km/h) - Human sprint limit for anti-cheat
 export const MERCHANT_GEOFENCE_METERS = 50;
+export const MAX_LOCATION_AGE_MS = 10_000;
 
 const EARTH_RADIUS_METERS = 6371000;
 
@@ -29,20 +30,37 @@ export function distanceKmToSteps(distanceKm: number): number {
   return Math.round((nonNegative(distanceKm) * 1000) / STEP_LENGTH_METERS);
 }
 
+export function calculateAveragePaceSecondsPerKm(
+  distanceKm: number,
+  activeSeconds: number,
+): number | null {
+  if (
+    !Number.isFinite(distanceKm) ||
+    !Number.isFinite(activeSeconds) ||
+    distanceKm <= 0.005 ||
+    activeSeconds <= 0
+  ) {
+    return null;
+  }
+  return activeSeconds / distanceKm;
+}
+
+export function formatPaceSeconds(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value <= 0) {
+    return '--';
+  }
+  const totalSeconds = Math.round(value);
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
 export function calculatePace(
   distanceKm: number,
   durationSeconds: number,
 ): string {
-  const distance = nonNegative(distanceKm);
-  const duration = nonNegative(durationSeconds);
-  if (distance <= 0.005 || duration <= 0) {
-    return '-- /km';
-  }
-  const minPerKm = duration / 60 / distance;
-  if (!Number.isFinite(minPerKm) || minPerKm <= 0 || minPerKm > 60) {
-    return '-- /km';
-  }
-  return `${minPerKm.toFixed(2)} /km`;
+  const formatted = formatPaceSeconds(
+    calculateAveragePaceSecondsPerKm(distanceKm, durationSeconds),
+  );
+  return formatted === '--' ? '-- /km' : `${formatted} /km`;
 }
 
 export function calculateSpeedKmh(
@@ -102,12 +120,4 @@ export function isWithinGeofence(
       ? radiusMeters
       : MERCHANT_GEOFENCE_METERS;
   return haversineDistanceMeters(userLocation, merchantLocation) <= radius;
-}
-
-export function formatPaceSeconds(value: number | null): string {
-  if (value === null || !Number.isFinite(value) || value <= 0) {
-    return '--';
-  }
-  const seconds = Math.round(value);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }

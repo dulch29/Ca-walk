@@ -45,7 +45,7 @@ type RootStack = {
   Coupons: undefined;
   RecordSummary: { summary: RunSummary };
   RecordStory: { summary: RunSummary };
-  RecordCamera: undefined;
+  RecordCamera: { sessionId: string };
   Profile: undefined;
   Settings: undefined;
   History: undefined;
@@ -87,7 +87,7 @@ function RecordTab() {
       onFinish={(summary, openStory) =>
         nav.navigate(openStory ? 'RecordStory' : 'RecordSummary', { summary })
       }
-      onCamera={() => nav.navigate('RecordCamera')}
+      onCamera={sessionId => nav.navigate('RecordCamera', { sessionId })}
     />
   );
 }
@@ -292,14 +292,16 @@ const RecordStoryRoute = ({ navigation, route }: Props<'RecordStory'>) => (
     onHome={() => navigation.reset({ index: 0, routes: [{ name: 'Main' }] })}
   />
 );
-const RecordCameraRoute = ({ navigation }: Props<'RecordCamera'>) => {
+const RecordCameraRoute = ({ navigation, route }: Props<'RecordCamera'>) => {
   const { addSessionPhoto } = useAppContext();
   return (
     <RecordCameraScreen
       onBack={navigation.goBack}
-      onCaptured={uri => {
-        addSessionPhoto(uri);
-        navigation.goBack();
+      onCaptured={async uri => {
+        await addSessionPhoto(uri, route.params.sessionId);
+        if (navigation.isFocused()) {
+          navigation.goBack();
+        }
       }}
     />
   );

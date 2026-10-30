@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
+  Linking,
   Pressable,
   Text,
   View,
@@ -19,24 +20,28 @@ import CatAvatar from '../components/CatAvatar';
 import { useAppContext } from '../context/AppContext';
 import { styles } from './RecordScreen.styles';
 import { OSM_CONFIG, OSM_MAP_STYLE } from '../services/osmMapService';
-import { haversineDistanceMeters } from '../services/locationUtils';
+import {
+  calculateAveragePaceSecondsPerKm,
+  formatPaceSeconds,
+  haversineDistanceMeters,
+} from '../services/locationUtils';
 import { formatDistance } from '../services/osmLocationService';
+import type { RunSummary, Sport } from '../types/activity';
+
+export type { RunSummary, Sport } from '../types/activity';
 
 const MAP_FALLBACK_BG = require('../../Assests/Images/record_map.jpg');
 
-import type { RunSummary, Sport } from '../types/activity';
 import {
   canFinishAtDestination,
   createRunSummary,
 } from '../services/completedActivity';
-export type { RunSummary, Sport } from '../types/activity';
-
 type Phase = 'idle' | 'pick' | 'ready' | 'recording' | 'paused';
 
 type Props = {
   onBack?: () => void;
   onFinish: (summary: RunSummary, openStory?: boolean) => void;
-  onCamera: () => void;
+  onCamera: (sessionId: string) => void;
 };
 
 export const SPORT_LABEL: Record<Sport, string> = { walk: 'เดิน', run: 'วิ่ง' };
@@ -47,14 +52,7 @@ export const fmtTime = (s: number) =>
   `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
 
 export const fmtPace = (seconds: number, km: number): string => {
-  if (km <= 0.005 || seconds <= 0) {
-    return '--';
-  }
-  const minPerKm = seconds / 60 / km;
-  if (!Number.isFinite(minPerKm) || minPerKm <= 0 || minPerKm > 60) {
-    return '--';
-  }
-  return minPerKm.toFixed(2);
+  return formatPaceSeconds(calculateAveragePaceSecondsPerKm(km, seconds));
 };
 
 const BUBBLE: Record<Phase, string> = {
@@ -107,7 +105,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
     endRunSession,
     speedFraudActive,
     trackingError,
-    currentLocation,
+    locationFix,
     selectedDestination,
     requestLocationPermission,
   } = useAppContext();
@@ -115,6 +113,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   const [localPhase, setLocalPhase] = useState<Phase>('ready');
   const [sport, setSport] = useState<Sport>('walk');
   const [mapError, setMapError] = useState(false);
+  const [mapReloadKey, setMapReloadKey] = useState(0);
   const [currentZoom, setCurrentZoom] = useState(16);
   const cameraRef = useRef<CameraRef>(null);
   const hasCenteredInitialFix = useRef(false);
@@ -138,19 +137,15 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   const km = activeSession?.distanceKm ?? 0;
   const steps = activeSession?.steps ?? 0;
   const pace =
-    activeSession?.currentPace && activeSession.currentPace !== '-- /km'
-      ? activeSession.currentPace
-      : km > 0.005 && seconds > 0
-      ? `${fmtPace(seconds, km)} /km`
-      : '-- /km';
+    km >= 0.03 && seconds >= 30 ? `${fmtPace(seconds, km)} /km` : '-- /km';
 
-  const hasGpsFix = currentLocation !== null;
+  const hasGpsFix = locationFix !== null;
   const currentLngLat: [number, number] | null = useMemo(
     () =>
-      currentLocation
-        ? [currentLocation.longitude, currentLocation.latitude]
+      locationFix
+        ? [locationFix.longitude, locationFix.latitude]
         : null,
-    [currentLocation],
+    [locationFix],
   );
 
   // Center camera when initial GPS fix is obtained
@@ -166,17 +161,27 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
     }
   }, [currentLngLat]);
 
-  // Actual recorded GPS track coordinates from session
+  // Accepted GPS track is separated into segments across pause/GPS gaps.
   const actualTrackCoords = activeSession?.trackCoordinates ?? [];
+  const actualTrackSegments = activeSession?.trackSegments ?? [];
 
   // Active destination (from session or selected before start)
   const activeDestination =
     activeSession?.destination ?? selectedDestination ?? null;
 
-  // Track waypoint progress along the destination route
-  const [passedWaypointIndex, setPassedWaypointIndex] = useState(0);
   const [isDestinationReached, setIsDestinationReached] = useState(false);
   const [isAutoFollowing, setIsAutoFollowing] = useState(true);
+  const [photoPromptVisible, setPhotoPromptVisible] = useState(false);
+  const arrivalStartedAtRef = useRef<number | null>(null);
+  const arrivalFixCountRef = useRef(0);
+  const arrivalLastFixTimestampRef = useRef<number | null>(null);
+  const arrivalPromptedSessionRef = useRef<string | null>(null);
+  const latestActiveSessionRef = useRef(activeSession);
+  const latestSpeedFraudActiveRef = useRef(speedFraudActive);
+  const photoPromptCountRef = useRef(0);
+  const lastPhotoPromptSecondsRef = useRef<number | null>(null);
+  latestActiveSessionRef.current = activeSession;
+  latestSpeedFraudActiveRef.current = speedFraudActive;
 
   // Auto-follow user camera during active recording
   useEffect(() => {
@@ -189,90 +194,32 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
     }
   }, [currentLngLat, phase, isAutoFollowing, currentZoom]);
 
-  // Dynamic route trimming: remove waypoints already traversed behind the user
-  const { remainingRouteCoords, distanceToDestinationMeters } = useMemo(() => {
-    if (
-      !activeDestination?.routeCoordinates ||
-      activeDestination.routeCoordinates.length < 2
-    ) {
-      return { remainingRouteCoords: [], distanceToDestinationMeters: null };
+  const plannedRouteCoords = activeDestination?.routeCoordinates ?? [];
+  const distanceToDestinationMeters = useMemo(() => {
+    if (!activeDestination || !currentLngLat) {
+      return null;
     }
-
-    const fullRoute = activeDestination.routeCoordinates;
-    const destCoord = activeDestination.coordinates;
-
-    if (!currentLngLat) {
-      return {
-        remainingRouteCoords: fullRoute,
-        distanceToDestinationMeters: null,
-      };
-    }
-
-    const distToDest = Math.round(
+    return Math.round(
       haversineDistanceMeters(
         { latitude: currentLngLat[1], longitude: currentLngLat[0] },
-        { latitude: destCoord[1], longitude: destCoord[0] },
+        {
+          latitude: activeDestination.coordinates[1],
+          longitude: activeDestination.coordinates[0],
+        },
       ),
     );
+  }, [activeDestination, currentLngLat]);
 
-    if (distToDest <= 25) {
-      if (!isDestinationReached) {
-        setIsDestinationReached(true);
-      }
-      return {
-        remainingRouteCoords: [],
-        distanceToDestinationMeters: distToDest,
-      };
-    }
-
-    // Look ahead from passedWaypointIndex to find closest forward waypoint along the route
-    let closestIndex = passedWaypointIndex;
-    let minDistance = Infinity;
-    const lookaheadLimit = Math.min(
-      passedWaypointIndex + 20,
-      fullRoute.length - 1,
-    );
-
-    for (let i = passedWaypointIndex; i <= lookaheadLimit; i++) {
-      const wp = fullRoute[i];
-      const d = haversineDistanceMeters(
-        { latitude: currentLngLat[1], longitude: currentLngLat[0] },
-        { latitude: wp[1], longitude: wp[0] },
-      );
-      if (d < minDistance) {
-        minDistance = d;
-        closestIndex = i;
-      }
-    }
-
-    // If within 35 meters of this forward waypoint, advance passed index
-    if (minDistance <= 35 && closestIndex > passedWaypointIndex) {
-      setPassedWaypointIndex(closestIndex);
-    }
-
-    if (closestIndex >= fullRoute.length - 1) {
-      return {
-        remainingRouteCoords: [],
-        distanceToDestinationMeters: distToDest,
-      };
-    }
-
-    // Connect from current user location forward to remaining waypoints
-    const remaining: Array<[number, number]> = [
-      currentLngLat,
-      ...fullRoute.slice(closestIndex + 1),
-    ];
-
-    return {
-      remainingRouteCoords: remaining,
-      distanceToDestinationMeters: distToDest,
-    };
-  }, [
-    activeDestination,
-    currentLngLat,
-    isDestinationReached,
-    passedWaypointIndex,
-  ]);
+  useEffect(() => {
+    arrivalStartedAtRef.current = null;
+    arrivalFixCountRef.current = 0;
+    arrivalLastFixTimestampRef.current = null;
+    arrivalPromptedSessionRef.current = null;
+    setIsDestinationReached(false);
+    setPhotoPromptVisible(false);
+    photoPromptCountRef.current = 0;
+    lastPhotoPromptSecondsRef.current = null;
+  }, [activeSession?.sessionId, activeDestination?.id]);
 
   const chooseSport = (s: Sport) => {
     setSport(s);
@@ -282,10 +229,9 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   const handleStart = async () => {
     try {
       if (!activeSession) {
-        setPassedWaypointIndex(0);
         setIsDestinationReached(false);
         setIsAutoFollowing(true);
-        await startRunSession(activeDestination ?? undefined);
+        await startRunSession(activeDestination ?? undefined, sport);
       }
     } catch (e) {
       Alert.alert(
@@ -334,25 +280,147 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
   };
 
   const canFinishArrived =
-    !speedFraudActive && canFinishAtDestination(activeSession);
-  const handleFinish = (reason: RunSummary['completionReason'] = 'manual') => {
-    if (
-      reason === 'arrived' &&
-      (speedFraudActive || !canFinishAtDestination(activeSession))
-    ) {
-      Alert.alert(
-        'ยังยืนยันจุดหมายไม่ได้',
-        'รอสัญญาณ GPS ใกล้จุดหมาย แล้วลองอีกครั้ง',
+    isDestinationReached &&
+    !speedFraudActive &&
+    canFinishAtDestination(activeSession);
+  const handleFinish = useCallback(
+    (reason: RunSummary['completionReason'] = 'manual') => {
+      const latestSession = latestActiveSessionRef.current;
+      if (
+        reason === 'arrived' &&
+        (latestSpeedFraudActiveRef.current ||
+          !canFinishAtDestination(latestSession))
+      ) {
+        Alert.alert(
+          'ยังยืนยันจุดหมายไม่ได้',
+          'รอสัญญาณ GPS ใกล้จุดหมาย แล้วลองอีกครั้ง',
+        );
+        return;
+      }
+      const completed = endRunSession(reason);
+      if (!completed) {
+        return;
+      }
+      onFinish(
+        createRunSummary(completed, completed.sport ?? sport, reason),
+        reason === 'arrived',
       );
+      setLocalPhase('ready');
+    },
+    [endRunSession, onFinish, sport],
+  );
+
+  const handleOpenCamera = () => {
+    setPhotoPromptVisible(false);
+    if (!activeSession) {
+      Alert.alert('เริ่มกิจกรรมก่อน', 'กดเริ่มแล้วจึงถ่ายรูปผูกกับกิจกรรมนี้ได้');
       return;
     }
-    const completed = endRunSession();
-    if (!completed) {
-      return;
-    }
-    onFinish(createRunSummary(completed, sport, reason), reason === 'arrived');
-    setLocalPhase('ready');
+    onCamera(activeSession.sessionId);
   };
+
+  const activeSessionId = activeSession?.sessionId ?? null;
+  const activeSessionStatus = activeSession?.status ?? null;
+
+  useEffect(() => {
+    if (
+      !activeSessionId ||
+      activeSessionStatus !== 'recording' ||
+      !activeDestination
+    ) {
+      return;
+    }
+    if (
+      !locationFix ||
+      locationFix.accuracy === null ||
+      locationFix.accuracy > 20 ||
+      Date.now() - locationFix.timestamp > 10_000
+    ) {
+      arrivalStartedAtRef.current = null;
+      arrivalFixCountRef.current = 0;
+      arrivalLastFixTimestampRef.current = null;
+      setIsDestinationReached(false);
+      return;
+    }
+    if (
+      arrivalLastFixTimestampRef.current !== null &&
+      locationFix.timestamp <= arrivalLastFixTimestampRef.current
+    ) {
+      return;
+    }
+    arrivalLastFixTimestampRef.current = locationFix.timestamp;
+
+    const distanceMeters = haversineDistanceMeters(
+      locationFix,
+      {
+        latitude: activeDestination.coordinates[1],
+        longitude: activeDestination.coordinates[0],
+      },
+    );
+    if (distanceMeters > 60) {
+      arrivalStartedAtRef.current = null;
+      arrivalFixCountRef.current = 0;
+      setIsDestinationReached(false);
+      return;
+    }
+    if (distanceMeters > 40) {
+      return;
+    }
+
+    if (arrivalStartedAtRef.current === null) {
+      arrivalStartedAtRef.current = locationFix.timestamp;
+      arrivalFixCountRef.current = 1;
+      return;
+    }
+    arrivalFixCountRef.current += 1;
+    const dwellMs = locationFix.timestamp - arrivalStartedAtRef.current;
+    if (dwellMs < 8_000 || arrivalFixCountRef.current < 3) {
+      return;
+    }
+
+    const alreadyPrompted = arrivalPromptedSessionRef.current === activeSessionId;
+    setIsDestinationReached(true);
+    setPhotoPromptVisible(false);
+    if (alreadyPrompted) {
+      return;
+    }
+    arrivalPromptedSessionRef.current = activeSessionId;
+    Alert.alert(
+      'ถึงจุดหมายแล้ว',
+      `ถึง ${activeDestination.name} แล้ว ต้องการจบกิจกรรมหรือเดินต่อ?`,
+      [
+        { text: 'เดินต่อ', style: 'cancel' },
+        { text: 'จบกิจกรรม', onPress: () => handleFinish('arrived') },
+      ],
+    );
+  }, [
+    activeDestination,
+    activeSessionId,
+    activeSessionStatus,
+    handleFinish,
+    locationFix,
+  ]);
+
+  useEffect(() => {
+    if (
+      !activeSession ||
+      activeSession.status !== 'recording' ||
+      trackingError ||
+      isDestinationReached ||
+      photoPromptVisible ||
+      photoPromptCountRef.current >= 2 ||
+      seconds < 180
+    ) {
+      return;
+    }
+    const lastPromptSeconds = lastPhotoPromptSecondsRef.current;
+    if (lastPromptSeconds !== null && seconds - lastPromptSeconds < 300) {
+      return;
+    }
+    lastPhotoPromptSecondsRef.current = seconds;
+    photoPromptCountRef.current += 1;
+    setPhotoPromptVisible(true);
+  }, [activeSession, isDestinationReached, photoPromptVisible, seconds, trackingError]);
 
   return (
     <View style={styles.root}>
@@ -360,6 +428,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
       <View style={styles.mapContainer}>
         {!mapError ? (
           <MapView
+            key={mapReloadKey}
             style={styles.mapView}
             mapStyle={OSM_MAP_STYLE}
             logo={false}
@@ -373,14 +442,12 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                 center: currentLngLat ?? DEFAULT_MAP_CENTER,
                 zoom: hasGpsFix ? 16 : 14,
               }}
-              center={currentLngLat ?? DEFAULT_MAP_CENTER}
-              zoom={currentZoom}
               minZoom={OSM_CONFIG.minZoom}
               maxZoom={OSM_CONFIG.maxZoom}
             />
 
-            {/* Destination Walking Route Preview (Dynamically trimmed as user moves) */}
-            {remainingRouteCoords.length > 1 && (
+            {/* Planned walking route remains distinct from the accepted GPS track. */}
+            {plannedRouteCoords.length > 1 && (
               <GeoJSONSource
                 id="destination-route-preview-source"
                 data={{
@@ -388,7 +455,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
                   properties: {},
                   geometry: {
                     type: 'LineString',
-                    coordinates: remainingRouteCoords,
+                    coordinates: plannedRouteCoords,
                   },
                 }}
               >
@@ -422,15 +489,17 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             )}
 
             {/* Actual Recorded GPS Track from Sensors/Location */}
-            {active && actualTrackCoords.length > 1 && (
+            {active && actualTrackSegments.some(segment => segment.length > 1) && (
               <GeoJSONSource
                 id="live-actual-route-source"
                 data={{
                   type: 'Feature',
                   properties: {},
                   geometry: {
-                    type: 'LineString',
-                    coordinates: actualTrackCoords,
+                    type: 'MultiLineString',
+                    coordinates: actualTrackSegments.filter(
+                      segment => segment.length > 1,
+                    ),
                   },
                 }}
               >
@@ -492,19 +561,39 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             )}
           </MapView>
         ) : (
-          <Image
-            source={MAP_FALLBACK_BG}
-            style={styles.mapBgImage}
-            resizeMode="cover"
-            accessibilityLabel="แผนที่ออฟไลน์"
-          />
+          <Pressable
+            style={styles.mapRetryContainer}
+            onPress={() => {
+              setMapError(false);
+              setMapReloadKey(value => value + 1);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="ลองโหลดแผนที่อีกครั้ง"
+          >
+            <Image
+              source={MAP_FALLBACK_BG}
+              style={styles.mapBgImage}
+              resizeMode="cover"
+              accessibilityLabel="ภาพพื้นหลังขณะแผนที่โหลดไม่สำเร็จ"
+            />
+            <View style={styles.mapRetryBadge}>
+              <Text style={styles.mapRetryText}>แผนที่โหลดไม่ได้ แตะเพื่อลองใหม่</Text>
+            </View>
+          </Pressable>
         )}
       </View>
 
       {/* Visible OSM Attribution Pill (Required by Policy) */}
-      <View style={styles.osmAttributionPill} pointerEvents="none">
+      <Pressable
+        style={styles.osmAttributionPill}
+        onPress={() => {
+          Linking.openURL('https://www.openstreetmap.org/copyright').catch(() => {});
+        }}
+        accessibilityRole="link"
+        accessibilityLabel="อ่านลิขสิทธิ์ OpenStreetMap"
+      >
         <Text style={styles.osmAttributionText}>{OSM_CONFIG.attribution}</Text>
-      </View>
+      </Pressable>
 
       {/* Waiting for GPS pill when no location fix - allows tapping to request permission */}
       {!hasGpsFix && (
@@ -594,6 +683,28 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
       {trackingError && !speedFraudActive && (
         <View style={styles.warningCard}>
           <Text style={styles.warningText}>⚠️ {trackingError}</Text>
+        </View>
+      )}
+
+      {photoPromptVisible && phase === 'recording' && (
+        <View style={styles.photoPromptCard}>
+          <Pressable
+            style={styles.photoPromptCopy}
+            onPress={handleOpenCamera}
+            accessibilityRole="button"
+            accessibilityLabel="ถ่ายรูปกิจกรรมตอนนี้"
+          >
+            <Text style={styles.photoPromptTitle}>📷 เก็บรูปช่วงนี้ไหม?</Text>
+            <Text style={styles.photoPromptText}>รูปจะอยู่เฉพาะกิจกรรมนี้</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setPhotoPromptVisible(false)}
+            accessibilityRole="button"
+            accessibilityLabel="ปิดคำชวนถ่ายรูป"
+            hitSlop={10}
+          >
+            <Text style={styles.photoPromptDismiss}>✕</Text>
+          </Pressable>
         </View>
       )}
 
@@ -765,7 +876,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             {/* Right: Camera Button */}
             <View style={styles.controlBtnCol}>
               <Pressable
-                onPress={onCamera}
+                onPress={handleOpenCamera}
                 accessibilityRole="button"
                 accessibilityLabel="ถ่ายรูปกิจกรรม"
                 style={styles.circleBtnSoft}
@@ -862,7 +973,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
 
             <View style={styles.controlBtnCol}>
               <Pressable
-                onPress={onCamera}
+                onPress={handleOpenCamera}
                 accessibilityRole="button"
                 accessibilityLabel="ถ่ายรูปกิจกรรม"
                 style={styles.circleBtnSoft}
@@ -890,7 +1001,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             {/* Left: Finish (Stop) */}
             <View style={styles.controlBtnCol}>
               <Pressable
-                onPress={() => handleFinish()}
+                onPress={() => handleFinish('manual')}
                 accessibilityRole="button"
                 accessibilityLabel="จบกิจกรรม"
                 style={styles.stopCircleBtn}
@@ -926,7 +1037,7 @@ export default function RecordScreen({ onBack, onFinish, onCamera }: Props) {
             {/* Right: Camera */}
             <View style={styles.controlBtnCol}>
               <Pressable
-                onPress={onCamera}
+                onPress={handleOpenCamera}
                 accessibilityRole="button"
                 accessibilityLabel="ถ่ายรูปกิจกรรม"
                 style={styles.circleBtnSoft}

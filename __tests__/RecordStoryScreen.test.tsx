@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, ScrollView, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import ReactTestRenderer, { act } from 'react-test-renderer';
 import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
@@ -73,6 +73,23 @@ afterEach(async () => {
     await act(async () => tree.unmount());
   }
   jest.restoreAllMocks();
+});
+
+it('shows the displayed Story 3 photo location in both labels', async () => {
+  await render({
+    ...storyFixture,
+    photos: ['file:///first.jpg', 'file:///queen-sirikit.jpg'],
+    photoLocations: {
+      'file:///first.jpg': 'สวนลุมพินี',
+      'file:///queen-sirikit.jpg': 'สวนสิริกิติ์',
+    },
+  });
+
+  const labels = tree.root
+    .findAllByType(Text)
+    .filter(node => node.props.children === 'สวนสิริกิติ์');
+  expect(labels).toHaveLength(2);
+  expect(text()).not.toContain('Your own route');
 });
 
 it('renders four artwork-only pages using actual steps, sport and average pace', async () => {
@@ -257,19 +274,20 @@ it('blocks static image failures and resets loading when retried or session chan
   );
   expect(button('แชร์ภาพกิจกรรม').props.disabled).toBe(true);
 });
-it('preserves seven-digit steps and bounds long Thai destinations to two lines', async () => {
+it('preserves seven-digit steps and bounds long photo locations to two lines', async () => {
+  const photo = 'file:///long-location.jpg';
+  const location = 'ชื่อสถานที่ภาษาไทยยาวมาก'.repeat(8);
   await render({
     ...storyFixture,
     steps: 1234567,
-    destinationName: 'ชื่อร้านกาแฟภาษาไทยยาวมาก'.repeat(8),
+    photos: [photo],
+    photoLocations: { [photo]: location },
   });
   expect(text()).toContain('1,234,567');
-  const labels = tree.root.findAll(
-    node =>
-      typeof node.props.children === 'string' &&
-      node.props.children.startsWith('จุดหมาย:'),
-  );
-  expect(labels.length).toBeGreaterThan(0);
+  const labels = tree.root
+    .findAllByType(Text)
+    .filter(node => node.props.children === location);
+  expect(labels).toHaveLength(2);
   expect(labels.every(node => node.props.numberOfLines === 2)).toBe(true);
 });
 

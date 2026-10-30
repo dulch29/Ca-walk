@@ -56,6 +56,29 @@ function toError(value: unknown, fallback: string): Error {
   return new Error(fallback);
 }
 
+function toTrackedLocation(position: {
+  coords: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    speed?: number | null;
+  };
+  timestamp: number;
+}): TrackedLocation {
+  const { coords, timestamp } = position;
+  const speed = coords.speed;
+  return {
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    accuracy: Number.isFinite(coords.accuracy) ? coords.accuracy : null,
+    timestamp,
+    speedKmh:
+      speed !== null && speed !== undefined && Number.isFinite(speed) && speed >= 0
+        ? speed * 3.6
+        : null,
+  };
+}
+
 export async function requestMotionPermissions(): Promise<boolean> {
   if (Platform.OS !== 'android') {
     return true;
@@ -99,6 +122,31 @@ export async function requestLocationPermissions(): Promise<boolean> {
   }
 }
 
+export async function getCurrentTrackedLocation(): Promise<TrackedLocation> {
+  const granted = await requestLocationPermissions();
+  if (!granted) {
+    throw new Error('กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อระบุตำแหน่งของคุณ');
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      Geolocation.getCurrentPosition(
+        position => resolve(toTrackedLocation(position)),
+        error => reject(new Error(error.message || 'อ่านตำแหน่ง GPS ไม่สำเร็จ')),
+        {
+          accuracy: { android: 'high' },
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 12000,
+          showLocationDialog: true,
+        },
+      );
+    } catch (error) {
+      reject(toError(error, 'อ่านตำแหน่ง GPS ไม่สำเร็จ'));
+    }
+  });
+}
+
 export async function startLocationWatch(
   onLocation: (location: TrackedLocation) => void,
   onError?: (error: Error) => void,
@@ -111,19 +159,7 @@ export async function startLocationWatch(
   let watchId: number;
   try {
     watchId = Geolocation.watchPosition(
-      ({ coords, timestamp }) => {
-        const speed = coords.speed;
-        onLocation({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: Number.isFinite(coords.accuracy) ? coords.accuracy : null,
-          timestamp,
-          speedKmh:
-            speed !== null && Number.isFinite(speed) && speed >= 0
-              ? speed * 3.6
-              : null,
-        });
-      },
+      position => onLocation(toTrackedLocation(position)),
       (error) => {
         onError?.(new Error(error.message || 'อ่านตำแหน่ง GPS ไม่สำเร็จ'));
       },
@@ -193,19 +229,7 @@ export async function startMotionTracking(
   let watchId: number;
   try {
     watchId = Geolocation.watchPosition(
-      ({ coords, timestamp }) => {
-        const speed = coords.speed;
-        onLocation({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: Number.isFinite(coords.accuracy) ? coords.accuracy : null,
-          timestamp,
-          speedKmh:
-            speed !== null && Number.isFinite(speed) && speed >= 0
-              ? speed * 3.6
-              : null,
-        });
-      },
+      position => onLocation(toTrackedLocation(position)),
       (error) => {
         onError?.(new Error(error.message || 'อ่านตำแหน่ง GPS ไม่สำเร็จ'));
       },

@@ -1,5 +1,54 @@
 {
-  "generated_at": "2026-10-29T16:04:24.238469+00:00",
-  "nodes": {},
+  "generated_at": "2026-10-29T16:54:06.171062+00:00",
+  "nodes": {
+    "app_tsx_app": {
+      "code_fingerprint": "baf113dd77d6505d416bebc16d7ff5b0231eb9d73a0d4ee56ba5af5ecdddcb33",
+      "label": "App.tsx",
+      "last": "2026-10-29T16:30:13.434248+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-29T16:30:13.434248+00:00",
+          "outcome": "useful",
+          "q": "Path from calculatePace to RecordStoryScreen"
+        }
+      ],
+      "score": 0.999616934,
+      "source_file": "App.tsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_context_appcontext": {
+      "code_fingerprint": "c3e40315f6cd70be80aee70ee919376ecfa28a35fc9d6cfff0534b1772219144",
+      "label": "AppContext.tsx",
+      "last": "2026-10-29T16:30:13.434248+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-29T16:30:13.434248+00:00",
+          "outcome": "useful",
+          "q": "Path from calculatePace to RecordStoryScreen"
+        }
+      ],
+      "score": 0.999616934,
+      "source_file": "src/context/AppContext.tsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_screens_recordstoryscreen": {
+      "code_fingerprint": "a77918082c967109f0d18c649ce0f89993df358365296589b41249e07a8c7f3c",
+      "label": "RecordStoryScreen.tsx",
+      "last": "2026-10-29T16:30:13.434248+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-29T16:30:13.434248+00:00",
+          "outcome": "useful",
+          "q": "Path from calculatePace to RecordStoryScreen"
+        }
+      ],
+      "score": 0.999616934,
+      "source_file": "src/screens/RecordStoryScreen.tsx",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
   "version": 1
 }

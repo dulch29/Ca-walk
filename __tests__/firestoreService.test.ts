@@ -84,19 +84,48 @@ test('requires the signed-in owner for reads and writes', async () => {
 test('saves a validated run activity with server timestamps', async () => {
   const id = await saveRunActivity('user-1', {
     sessionId: 'run-1',
+    sport: 'run',
     startTime: '2026-10-25T00:00:00.000Z',
     endTime: '2026-10-25T00:01:00.000Z',
     durationSeconds: 60,
     steps: 100,
     distanceKm: 0.075,
     averagePace: '13\'20" /km',
+    averagePaceSecondsPerKm: 800,
+    distanceSource: 'gps',
+    completionReason: 'arrived',
   });
   expect(id).toBe('run-1');
   expect(firestoreMocks.setDoc).toHaveBeenCalledTimes(1);
   expect(firestoreMocks.setDoc.mock.calls[0][1]).toMatchObject({
     sessionId: 'run-1',
-    sport: 'walk',
+    sport: 'run',
     steps: 100,
     distanceKm: 0.075,
+    averagePaceSecondsPerKm: 800,
+    distanceSource: 'gps',
+    completionReason: 'arrived',
+  });
+});
+
+test('maps new numeric fields while remaining compatible with old activities', () => {
+  const timestamp = { toDate: () => new Date('2026-10-25T00:00:00.000Z') };
+  const mapped = __testing.mapRunActivity('run-new', {
+    startedAt: timestamp,
+    endedAt: timestamp,
+    sport: 'run',
+    steps: 100,
+    distanceKm: 5,
+    durationSeconds: 1800,
+    averagePace: '6:00 /km',
+    averagePaceSecondsPerKm: 360,
+    distanceSource: 'gps',
+    completionReason: 'manual',
+  });
+  expect(mapped).toMatchObject({
+    sport: 'run',
+    averagePaceSecondsPerKm: 360,
+    distanceSource: 'gps',
+    completionReason: 'manual',
   });
 });

@@ -12,6 +12,10 @@ import {
 } from '@react-native-firebase/firestore';
 import type { Coupon, Merchant, RunSession } from './mockData';
 import { getCurrentFirebaseUser } from './firebase';
+import {
+  calculateAveragePaceSecondsPerKm,
+  calculatePace,
+} from './locationUtils';
 
 export interface FirestoreUserProfile {
   uid: string;
@@ -155,6 +159,23 @@ function mapRunActivity(
     steps,
     distanceKm,
     averagePace: data.averagePace,
+    ...(data.sport === 'walk' || data.sport === 'run'
+      ? { sport: data.sport }
+      : {}),
+    averagePaceSecondsPerKm:
+      data.averagePaceSecondsPerKm === null
+        ? null
+        : finiteNumber(data.averagePaceSecondsPerKm) ??
+          calculateAveragePaceSecondsPerKm(distanceKm, durationSeconds),
+    ...(data.distanceSource === 'gps' || data.distanceSource === 'unavailable'
+      ? { distanceSource: data.distanceSource }
+      : {}),
+    ...(data.completionReason === 'manual' || data.completionReason === 'arrived'
+      ? { completionReason: data.completionReason }
+      : {}),
+    ...(typeof data.destinationName === 'string'
+      ? { destinationName: data.destinationName }
+      : {}),
   };
 }
 
@@ -326,17 +347,36 @@ export async function saveRunActivity(
     'activities',
     session.sessionId,
   );
-  await setDoc(activityRef, {
+  const averagePaceSecondsPerKm =
+    session.averagePaceSecondsPerKm ??
+    calculateAveragePaceSecondsPerKm(
+      session.distanceKm,
+      session.durationSeconds,
+    );
+  const payload: FirestoreRecord = {
     sessionId: session.sessionId,
-    sport: 'walk',
+    sport: session.sport ?? 'walk',
     steps: session.steps,
     distanceKm: session.distanceKm,
     durationSeconds: session.durationSeconds,
-    averagePace: session.averagePace,
+    averagePace:
+      session.averagePace ||
+      calculatePace(session.distanceKm, session.durationSeconds),
+    averagePaceSecondsPerKm,
+    distanceSource:
+      session.distanceSource ??
+      (session.distanceKm > 0 ? 'gps' : 'unavailable'),
     startedAt,
     endedAt,
     createdAt: FieldValue.serverTimestamp(),
-  });
+  };
+  if (session.completionReason) {
+    payload.completionReason = session.completionReason;
+  }
+  if (session.destinationName) {
+    payload.destinationName = session.destinationName;
+  }
+  await setDoc(activityRef, payload);
   return activityRef.id || session.sessionId;
 }
 

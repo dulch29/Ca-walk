@@ -14,6 +14,7 @@ export interface RunSummary {
   completionReason: 'manual' | 'arrived';
   destinationName?: string;
   photos: string[];
+  photoLocations?: Record<string, string>;
   trackCoordinates: LngLat[];
   trackSegments?: LngLat[][];
 }

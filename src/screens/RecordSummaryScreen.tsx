@@ -10,14 +10,13 @@ import {
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import CatAvatar from '../components/CatAvatar';
 import { radius, space } from '../theme';
+import { formatPaceSeconds } from '../services/locationUtils';
+import type { RunSummary } from '../types/activity';
 import {
   fmtTime,
   SPORT_ICON,
   SPORT_LABEL,
 } from './RecordScreen';
-
-import type { RunSummary } from '../types/activity';
-import { formatPaceSeconds } from '../services/locationUtils';
 
 type Props = {
   summary: RunSummary;
@@ -51,8 +50,8 @@ export default function RecordSummaryScreen({
   onBack,
   onStory,
 }: Props) {
-  const end = new Date(summary.endTime);
   const start = new Date(summary.startTime);
+  const end = new Date(summary.endTime);
   const coins = coinsFor(summary.km);
 
   return (
@@ -105,7 +104,7 @@ export default function RecordSummaryScreen({
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statCol}>
-            <Text style={styles.statLabel}>Pace</Text>
+            <Text style={styles.statLabel}>Pace เฉลี่ย</Text>
             <Text style={styles.statValue}>
               {formatPaceSeconds(summary.averagePaceSecondsPerKm)} /km
             </Text>

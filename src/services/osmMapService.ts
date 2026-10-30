@@ -9,12 +9,20 @@
 
 export const OSM_CONFIG = {
   tileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  overpassUrl: 'https://overpass-api.de/api/interpreter',
+  nominatimUrl: 'https://nominatim.openstreetmap.org',
+  footRoutingUrl:
+    'https://routing.openstreetmap.de/routed-foot/route/v1/foot',
   attribution: '© OpenStreetMap contributors',
   attributionUrl: 'https://www.openstreetmap.org/copyright',
   maxZoom: 19,
   minZoom: 2,
   defaultZoom: 15.5,
-  userAgent: 'CaWalk-Android/1.0 (prototype; contact: support@cawalk.app)',
+  requestTimeoutMs: 12_000,
+  cacheTtlMs: 10 * 60 * 1000,
+  nominatimMinimumIntervalMs: 1000,
+  routeMinimumIntervalMs: 1000,
+  userAgent: 'CaWalk-Android/1.0',
 };
 
 /**

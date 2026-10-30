@@ -1,3 +1,5 @@
+import type { LngLat, Sport } from '../types/activity';
+
 export interface Coordinates {
   latitude: number;
   longitude: number;
@@ -5,6 +7,7 @@ export interface Coordinates {
 
 export interface RunSession {
   sessionId: string;
+  sport?: Sport;
   startTime: string;
   endTime: string;
   durationSeconds: number;
@@ -12,9 +15,14 @@ export interface RunSession {
   distanceKm: number;
   averagePace: string;
   gpsDistanceKm?: number;
+  averagePaceSecondsPerKm?: number | null;
+  distanceSource?: 'gps' | 'unavailable';
+  completionReason?: 'manual' | 'arrived';
   destinationName?: string;
   photos?: string[];
-  trackCoordinates?: Array<[number, number]>;
+  photoLocations?: Record<string, string>;
+  trackCoordinates?: LngLat[];
+  trackSegments?: LngLat[][];
 }
 
 export interface MerchantMetrics {

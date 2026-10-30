@@ -1,5 +1,7 @@
 import {
+  calculateAveragePaceSecondsPerKm,
   calculatePace,
+  formatPaceSeconds,
   haversineDistanceMeters,
   stepsToDistanceKm,
   distanceKmToSteps,
@@ -9,7 +11,32 @@ import {
 import { fmtPace } from '../src/screens/RecordScreen';
 
 describe('locationUtils - Pace and Distance Calculations', () => {
-  describe('calculatePace (decimal format with 2 decimal places)', () => {
+  describe('average pace helpers', () => {
+    it('returns numeric seconds per kilometre from accepted distance and active time', () => {
+      expect(calculateAveragePaceSecondsPerKm(5, 1800)).toBe(360);
+      expect(calculateAveragePaceSecondsPerKm(1, 640)).toBe(640);
+    });
+
+    it('returns null when distance or active time is unavailable', () => {
+      expect(calculateAveragePaceSecondsPerKm(0, 100)).toBeNull();
+      expect(calculateAveragePaceSecondsPerKm(0.005, 100)).toBeNull();
+      expect(calculateAveragePaceSecondsPerKm(-1, 100)).toBeNull();
+      expect(calculateAveragePaceSecondsPerKm(1, 0)).toBeNull();
+      expect(calculateAveragePaceSecondsPerKm(1, Number.NaN)).toBeNull();
+      expect(calculateAveragePaceSecondsPerKm(Number.POSITIVE_INFINITY, 100)).toBeNull();
+    });
+
+    it('formats pace once as m:ss without adding the unit', () => {
+      expect(formatPaceSeconds(640)).toBe('10:40');
+      expect(formatPaceSeconds(359.6)).toBe('6:00');
+      expect(formatPaceSeconds(null)).toBe('--');
+      expect(formatPaceSeconds(Number.NaN)).toBe('--');
+      expect(formatPaceSeconds(Number.POSITIVE_INFINITY)).toBe('--');
+      expect(formatPaceSeconds(0)).toBe('--');
+    });
+  });
+
+  describe('calculatePace compatibility helper', () => {
     it('returns -- /km when distance is zero or negative', () => {
       expect(calculatePace(0, 300)).toBe('-- /km');
       expect(calculatePace(-1, 300)).toBe('-- /km');
@@ -20,37 +47,26 @@ describe('locationUtils - Pace and Distance Calculations', () => {
       expect(calculatePace(1.5, -10)).toBe('-- /km');
     });
 
-    it('calculates decimal pace with 2 decimal places (min/km)', () => {
-      // 1.0 km in 640 seconds -> (640 / 60) / 1.0 = 10.6666... -> 10.67 /km
-      expect(calculatePace(1.0, 640)).toBe('10.67 /km');
-
-      // 1.3 km in 780 seconds (13 minutes) -> (780 / 60) / 1.3 = 10.00 /km
-      expect(calculatePace(1.3, 780)).toBe('10.00 /km');
-
-      // 5.0 km in 1500 seconds (25 minutes) -> 5.00 /km
-      expect(calculatePace(5.0, 1500)).toBe('5.00 /km');
-
-      // 0.5 km in 200 seconds -> (200 / 60) / 0.5 = 6.6666... -> 6.67 /km
-      expect(calculatePace(0.5, 200)).toBe('6.67 /km');
-    });
-
-    it('returns -- /km when pace is slower than 60 min/km (stationary / crawling)', () => {
-      // 0.01 km in 3600 seconds = 3600 / 0.6 = 6000 min/km
-      expect(calculatePace(0.01, 3600)).toBe('-- /km');
+    it('delegates to the shared m:ss formatter', () => {
+      expect(calculatePace(1.0, 640)).toBe('10:40 /km');
+      expect(calculatePace(1.3, 780)).toBe('10:00 /km');
+      expect(calculatePace(5.0, 1500)).toBe('5:00 /km');
+      expect(calculatePace(0.5, 200)).toBe('6:40 /km');
+      expect(calculatePace(0.01, 3600)).toBe('6000:00 /km');
     });
   });
 
-  describe('fmtPace (RecordScreen decimal pace helper)', () => {
+  describe('fmtPace (RecordScreen compatibility helper)', () => {
     it('returns -- when km or seconds is zero or invalid', () => {
       expect(fmtPace(0, 0)).toBe('--');
       expect(fmtPace(100, 0)).toBe('--');
       expect(fmtPace(0, 1.2)).toBe('--');
     });
 
-    it('returns formatted 2 decimal places string', () => {
-      expect(fmtPace(640, 1.0)).toBe('10.67');
-      expect(fmtPace(780, 1.3)).toBe('10.00');
-      expect(fmtPace(300, 0.5)).toBe('10.00');
+    it('returns shared m:ss formatting', () => {
+      expect(fmtPace(640, 1.0)).toBe('10:40');
+      expect(fmtPace(780, 1.3)).toBe('10:00');
+      expect(fmtPace(300, 0.5)).toBe('10:00');
     });
   });
 

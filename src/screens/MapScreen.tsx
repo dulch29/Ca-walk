@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,33 +10,19 @@ import {
   View,
 } from 'react-native';
 import {
-  Map as MapView,
   Camera,
-  CameraRef,
-  Marker,
+  type CameraRef,
   GeoJSONSource,
   Layer,
+  Map as MapView,
+  Marker,
 } from '@maplibre/maplibre-react-native';
-import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import CatAvatar from '../components/CatAvatar';
-import {
-  AmazonLogo,
-  InthaninLogo,
-  KfcLogo,
-  SevenElevenLogo,
-} from '../components/BrandLogos';
 import { useAppContext, type ActivityDestination } from '../context/AppContext';
-import { radius } from '../theme';
 import { OSM_CONFIG, OSM_MAP_STYLE } from '../services/osmMapService';
-import {
-  formatDistance,
-  getWalkingRoute,
-  searchPlaces,
-  MAX_SEARCH_RADIUS_METERS,
-  type OsmPlace,
-  type RoutePreview,
-} from '../services/osmLocationService';
-import { haversineDistanceMeters } from '../services/locationUtils';
+import * as osmLocationService from '../services/osmLocationService';
+import type { TrackedLocation } from '../services/motionTracker';
+import { radius } from '../theme';
 
 type Props = {
   onBack: () => void;
@@ -44,1724 +30,865 @@ type Props = {
   onStartRecord?: (destination: ActivityDestination) => void;
 };
 
-const STORE_AMAZON_IMG = require('../../Assests/Images/store_amazon.jpg');
-const STORE_7ELEVEN_IMG = require('../../Assests/Images/store_7eleven.jpg');
-const STORE_KFC_IMG = require('../../Assests/Images/store_kfc.jpg');
+type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+type LocationState = 'locating' | 'ready' | 'denied' | 'error';
+type LngLat = [number, number];
 
-const FILTERS = ['ทั้งหมด', 'ใกล้ฉัน', 'ส่วนลด', 'อาหาร & เครื่องดื่ม'];
+const locationServices = osmLocationService;
 
-export interface StoreMarker {
-  id: string;
-  name: string;
-  branch: string;
-  brand: 'amazon' | '7eleven' | 'inthanin' | 'kfc' | 'chula';
-  distance: string;
-  rating: number;
-  hasCoupon: boolean;
-  couponText?: string;
-  category: 'all' | 'nearby' | 'coupon' | 'food';
-  coordinates: [number, number]; // [lng, lat]
-  image: any;
-}
+const RADII = [1000, 3000, 5000] as const;
+const MAX_FIX_AGE_MS = 10_000;
+const MAX_FIX_ACCURACY_METERS = 25;
+const WORLD_CENTER: LngLat = [0, 0];
 
-// Bangkok Chula - Siam - Bantadthong stores (Mock partner stores for prototype)
-const STORE_MARKERS: StoreMarker[] = [
-  {
-    id: 's1',
-    name: 'Cafe Amazon',
-    branch: 'สาขา สยามสแควร์วัน',
-    brand: 'amazon',
-    distance: '1.2 km',
-    rating: 4.5,
-    hasCoupon: true,
-    couponText: 'ลด 15.- เครื่องดื่มทุกเมนู',
-    category: 'food',
-    coordinates: [100.5315, 13.7445],
-    image: STORE_AMAZON_IMG,
-  },
-  {
-    id: 's2',
-    name: '7-Eleven',
-    branch: 'สาขา บรรทัดทอง ซอย 12',
-    brand: '7eleven',
-    distance: '0.8 km',
-    rating: 4.2,
-    hasCoupon: true,
-    couponText: 'คูปองแลกซื้อไส้กรอก 10.-',
-    category: 'nearby',
-    coordinates: [100.5235, 13.738],
-    image: STORE_7ELEVEN_IMG,
-  },
-  {
-    id: 's3',
-    name: 'Inthanin Coffee',
-    branch: 'สาขา สามย่าน มิตรทาวน์',
-    brand: 'inthanin',
-    distance: '1.5 km',
-    rating: 4.6,
-    hasCoupon: false,
-    category: 'food',
-    coordinates: [100.5285, 13.7335],
-    image: STORE_AMAZON_IMG,
-  },
-  {
-    id: 's4',
-    name: 'KFC',
-    branch: 'สาขา MBK Center ชั้น G',
-    brand: 'kfc',
-    distance: '2.1 km',
-    rating: 4.0,
-    hasCoupon: true,
-    couponText: 'ลด 20.- ชุดโดนใจ',
-    category: 'food',
-    coordinates: [100.5303, 13.746],
-    image: STORE_KFC_IMG,
-  },
-  {
-    id: 's5',
-    name: 'Chula Sweet ขนมหวาน',
-    branch: 'สาขา สวนหลวงสแควร์',
-    brand: 'chula',
-    distance: '0.5 km',
-    rating: 4.7,
-    hasCoupon: false,
-    category: 'nearby',
-    coordinates: [100.5265, 13.735],
-    image: STORE_7ELEVEN_IMG,
-  },
-];
-
-// Bangkok default map center when GPS is not yet available
-const DEFAULT_CENTER: [number, number] = [100.528, 13.739];
-
-const ROUTE_PREVIEW_CASING_STYLE = {
-  lineColor: '#1E3A8A',
-  lineWidth: 6,
+const ROUTE_CASING_STYLE = {
+  lineColor: '#FFFFFF',
+  lineWidth: 7,
   lineCap: 'round',
   lineJoin: 'round',
 } as const;
 
-const ROUTE_PREVIEW_LINE_STYLE = {
-  lineColor: '#3B82F6',
+const ROUTE_STYLE = {
+  lineColor: '#2563EB',
   lineWidth: 4,
   lineCap: 'round',
   lineJoin: 'round',
 } as const;
 
-export default function MapScreen({
-  onBack,
-  onOpenStore,
-  onStartRecord,
-}: Props) {
-  const {
-    currentLocation,
-    setSelectedDestination,
-    requestLocationPermission,
-  } = useAppContext();
-  const [filter, setFilter] = useState(FILTERS[0]);
-  const [searchText, setSearchText] = useState('');
-  const [selectedStore, setSelectedStore] = useState<StoreMarker | null>(null);
-
-  // OSM Geocoding state
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<OsmPlace[]>([]);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
-
-  // Destination & Route preview state
-  const [selectedPlace, setSelectedPlace] = useState<OsmPlace | null>(null);
-  const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
-  const [routingLoading, setRoutingLoading] = useState(false);
-  const [routingError, setRoutingError] = useState<string | null>(null);
-
-  const [mapError, setMapError] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(15.5);
-  const cameraRef = useRef<CameraRef>(null);
-  const hasCenteredInitialFix = useRef(false);
-
-  const hasGpsFix = currentLocation !== null;
-  const userCoords: [number, number] | null = useMemo(
-    () =>
-      currentLocation
-        ? [currentLocation.longitude, currentLocation.latitude]
-        : null,
-    [currentLocation],
+function validFix(fix: TrackedLocation | null, now = Date.now()): fix is TrackedLocation {
+  return Boolean(
+    fix &&
+      Number.isFinite(fix.latitude) &&
+      fix.latitude >= -90 &&
+      fix.latitude <= 90 &&
+      Number.isFinite(fix.longitude) &&
+      fix.longitude >= -180 &&
+      fix.longitude <= 180 &&
+      typeof fix.accuracy === 'number' &&
+      fix.accuracy >= 0 &&
+      fix.accuracy <= MAX_FIX_ACCURACY_METERS &&
+      Number.isFinite(fix.timestamp) &&
+      fix.timestamp <= now + 1000 &&
+      now - fix.timestamp <= MAX_FIX_AGE_MS,
   );
+}
 
-  // Camera center: real GPS if fix available, otherwise default Bangkok area
-  const cameraCenter: [number, number] = userCoords ?? DEFAULT_CENTER;
+function coordsFromFix(fix: TrackedLocation): LngLat {
+  return [fix.longitude, fix.latitude];
+}
 
-  // Request location permission on mount to observe user location
-  useEffect(() => {
-    requestLocationPermission().catch(() => {});
-  }, [requestLocationPermission]);
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof Error && error.name === 'AbortError') ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'aborted')
+  );
+}
 
-  // Center camera when initial GPS fix is obtained
-  useEffect(() => {
-    if (userCoords && !hasCenteredInitialFix.current) {
-      hasCenteredInitialFix.current = true;
-      cameraRef.current?.flyTo({
-        center: userCoords,
-        zoom: 15.5,
-        duration: 800,
-      });
-    }
-  }, [userCoords]);
+function errorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+  const message = error.message;
+  const lower = message.toLowerCase();
+  if (lower.includes('permission') || lower.includes('อนุญาต')) {
+    return 'ไม่ได้รับสิทธิ์ตำแหน่ง กรุณาเปิด GPS และอนุญาตตำแหน่งแล้วลองใหม่';
+  }
+  if (lower.includes('429') || lower.includes('จำกัดคำขอ')) {
+    return 'บริการค้นหากำลังจำกัดคำขอ กรุณารอสักครู่แล้วลองใหม่';
+  }
+  if (lower.includes('timeout') || lower.includes('หมดเวลา')) {
+    return 'บริการตอบช้าเกินไป กรุณาลองใหม่';
+  }
+  if (lower.includes('network') || lower.includes('offline') || lower.includes('fetch')) {
+    return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาตรวจสอบเครือข่ายแล้วลองใหม่';
+  }
+  return message || fallback;
+}
 
-  // Filter store pins
-  const filteredStores = STORE_MARKERS.filter((store) => {
-    if (filter === 'ใกล้ฉัน' && store.category !== 'nearby') {
-      return false;
-    }
-    if (filter === 'ส่วนลด' && !store.hasCoupon) {
-      return false;
-    }
-    if (filter === 'อาหาร & เครื่องดื่ม' && store.category !== 'food') {
-      return false;
-    }
-    return true;
-  });
+function radiusLabel(radiusMeters: number): string {
+  return `${radiusMeters / 1000} กม.`;
+}
 
-  const handleSearchSubmit = async () => {
-    const query = searchText.trim();
-    if (!query) {
-      setSearchResults([]);
-      setHasSearched(false);
-      return;
-    }
-    setIsSearching(true);
-    setSearchError(null);
-    setHasSearched(true);
+function sortPlaces(places: osmLocationService.OsmPlace[]) {
+  return [...places].sort(
+    (a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity),
+  );
+}
 
-    // Prompt/ensure user location is examined first to prioritize closest branches
-    let activeCoords = userCoords;
-    if (!activeCoords) {
-      try {
-        await requestLocationPermission();
-        if (currentLocation) {
-          activeCoords = [currentLocation.longitude, currentLocation.latitude];
-        }
-      } catch {
-        // Non-blocking
-      }
-    }
+function validRoute(
+  route: osmLocationService.RoutePreview | null,
+): route is osmLocationService.RoutePreview {
+  return Boolean(
+    route &&
+      route.coordinates.length >= 2 &&
+      route.coordinates.every(
+        ([lng, lat]) =>
+          Number.isFinite(lng) &&
+          lng >= -180 &&
+          lng <= 180 &&
+          Number.isFinite(lat) &&
+          lat >= -90 &&
+          lat <= 90,
+      ) &&
+      Number.isFinite(route.distanceMeters) &&
+      route.distanceMeters > 0 &&
+      Number.isFinite(route.durationSeconds) &&
+      route.durationSeconds > 0,
+  );
+}
+
+function routeBounds(coordinates: LngLat[]): [number, number, number, number] {
+  const lngs = coordinates.map(([lng]) => lng);
+  const lats = coordinates.map(([, lat]) => lat);
+  return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
+}
+
+export default function MapScreen({ onBack, onStartRecord }: Props) {
+  const {
+    locationFix,
+    requestCurrentLocation,
+    setSelectedDestination,
+  } = useAppContext();
+  const cameraRef = useRef<CameraRef>(null);
+  const activeCoordsRef = useRef<LngLat | null>(null);
+  const activeFixRef = useRef<TrackedLocation | null>(null);
+  const nearbyAbortRef = useRef<AbortController | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const routeAbortRef = useRef<AbortController | null>(null);
+  const nearbyRequestIdRef = useRef(0);
+  const searchRequestIdRef = useRef(0);
+  const routeRequestIdRef = useRef(0);
+  const loadedInitialNearbyRef = useRef(false);
+  const centeredInitialFixRef = useRef(false);
+  const userMovedMapRef = useRef(false);
+
+  const [locationState, setLocationState] = useState<LocationState>('locating');
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [userCoords, setUserCoords] = useState<LngLat | null>(
+    validFix(locationFix) ? coordsFromFix(locationFix) : null,
+  );
+  const [radiusMeters, setRadiusMeters] = useState<number>(1000);
+  const [nearbyState, setNearbyState] = useState<LoadState>('idle');
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<osmLocationService.OsmPlace[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchState, setSearchState] = useState<LoadState>('idle');
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<osmLocationService.OsmPlace[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<osmLocationService.OsmPlace | null>(null);
+  const [routeState, setRouteState] = useState<LoadState>('idle');
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routePreview, setRoutePreview] = useState<osmLocationService.RoutePreview | null>(null);
+  const [tileError, setTileError] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const [currentZoom, setCurrentZoom] = useState(15.5);
+
+  const loadNearby = useCallback(async (coords: LngLat, radiusToLoad: number) => {
+    nearbyAbortRef.current?.abort();
+    const controller = new AbortController();
+    nearbyAbortRef.current = controller;
+    const requestId = ++nearbyRequestIdRef.current;
+    setNearbyState('loading');
+    setNearbyError(null);
 
     try {
-      const qLower = query.toLowerCase();
-
-      // Find partner stores matching query (e.g. KFC, Cafe Amazon, 7-Eleven)
-      const matchingStores = STORE_MARKERS.filter((store) => {
-        const name = store.name.toLowerCase();
-        const branch = store.branch.toLowerCase();
-        const brand = store.brand.toLowerCase();
-        return (
-          name.includes(qLower) ||
-          branch.includes(qLower) ||
-          brand.includes(qLower) ||
-          (qLower === 'kfc' && brand === 'kfc') ||
-          (qLower === 'amazon' && brand === 'amazon') ||
-          (qLower === 'inthanin' && brand === 'inthanin') ||
-          (qLower === '7-eleven' && brand === '7eleven') ||
-          (qLower === '7eleven' && brand === '7eleven') ||
-          (qLower === 'เซเว่น' && brand === '7eleven')
-        );
-      });
-
-      const partnerPlaces: OsmPlace[] = matchingStores.map((store) => {
-        const dist = activeCoords
-          ? Math.round(
-              haversineDistanceMeters(
-                { latitude: activeCoords[1], longitude: activeCoords[0] },
-                {
-                  latitude: store.coordinates[1],
-                  longitude: store.coordinates[0],
-                },
-              ),
-            )
-          : undefined;
-
-        return {
-          id: `store-${store.id}`,
-          name: store.name,
-          displayName: `${store.name} (${store.branch})`,
-          category: 'shop',
-          coordinates: store.coordinates,
-          distanceMeters: dist,
-        };
-      });
-
-      // Search real OSM places with user location bias
-      let osmPlaces: OsmPlace[] = [];
-      try {
-        osmPlaces = await searchPlaces(query, {
-          userCoords: activeCoords ?? undefined,
-        });
-      } catch (osmErr) {
-        if (partnerPlaces.length === 0) {
-          throw osmErr;
-        }
-      }
-
-      // Combine both sources
-      const combined = [...partnerPlaces, ...osmPlaces];
-
-      // Keep only places within realistic nearby proximity (<= 30 km)
-      // Eliminates far-flung results (like 904 km or 2205 km)
-      const nearbyResults = activeCoords
-        ? combined.filter(
-            (p) =>
-              p.distanceMeters !== undefined &&
-              p.distanceMeters <= MAX_SEARCH_RADIUS_METERS,
-          )
-        : combined;
-
-      let finalResults = nearbyResults;
-      if (finalResults.length === 0 && activeCoords) {
-        finalResults = combined.filter(
-          (p) =>
-            p.distanceMeters !== undefined &&
-            p.distanceMeters <= 60000,
-        );
-      }
-
-      // Sort by proximity: closest first
-      if (activeCoords) {
-        finalResults.sort(
-          (a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity),
-        );
-      }
-
-      setSearchResults(finalResults);
-    } catch (err) {
-      setSearchError(
-        err instanceof Error ? err.message : 'ค้นหาสถานที่ไม่สำเร็จ',
+      const places = await locationServices.getNearbyPlaces(
+        coords,
+        radiusToLoad,
+        controller.signal,
       );
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleSelectPlace = async (place: OsmPlace) => {
-    setSelectedStore(null);
-    setSelectedPlace(place);
-    setSearchResults([]);
-    setSearchError(null);
-    setRoutePreview(null);
-    setRoutingError(null);
-
-    cameraRef.current?.flyTo({
-      center: place.coordinates,
-      zoom: 16.5,
-      duration: 600,
-    });
-
-    if (userCoords) {
-      setRoutingLoading(true);
-      try {
-        const route = await getWalkingRoute(userCoords, place.coordinates);
-        if (route) {
-          setRoutePreview(route);
-        } else {
-          setRoutingError(
-            'ไม่สามารถเชื่อมต่อคำนวณเส้นทางได้ แต่ยังสามารถเริ่มเดินได้',
-          );
-        }
-      } catch {
-        setRoutingError(
-          'ไม่สามารถเชื่อมต่อคำนวณเส้นทางได้ แต่ยังสามารถเริ่มเดินได้',
-        );
-      } finally {
-        setRoutingLoading(false);
-      }
-    } else {
-      setRoutingError('รอสัญญาณ GPS เพื่อแสดงเส้นทางเดิน');
-    }
-  };
-
-  const handleSelectStore = async (store: StoreMarker) => {
-    setSelectedPlace(null);
-    setRoutePreview(null);
-    setRoutingError(null);
-    setSearchResults([]);
-    setSelectedStore(store);
-
-    cameraRef.current?.flyTo({
-      center: store.coordinates,
-      zoom: 16.5,
-      duration: 600,
-    });
-
-    if (userCoords) {
-      setRoutingLoading(true);
-      try {
-        const route = await getWalkingRoute(userCoords, store.coordinates);
-        if (route) {
-          setRoutePreview(route);
-        }
-      } catch {
-        // Route preview is non-blocking for stores
-      } finally {
-        setRoutingLoading(false);
-      }
-    }
-  };
-
-  const handleSelectSearchResult = (place: OsmPlace) => {
-    if (place.id.startsWith('store-')) {
-      const storeId = place.id.replace('store-', '');
-      const store = STORE_MARKERS.find((s) => s.id === storeId);
-      if (store) {
-        handleSelectStore(store);
+      if (requestId !== nearbyRequestIdRef.current) {
         return;
       }
+      const sorted = sortPlaces(places);
+      setNearbyPlaces(sorted);
+      setNearbyState(sorted.length > 0 ? 'ready' : 'empty');
+    } catch (error) {
+      if (requestId !== nearbyRequestIdRef.current || isAbortError(error)) {
+        return;
+      }
+      setNearbyPlaces([]);
+      setNearbyState('error');
+      setNearbyError(errorMessage(error, 'ค้นหาร้านใกล้ตัวไม่สำเร็จ'));
     }
-    handleSelectPlace(place);
-  };
+  }, []);
 
-  const handleGoToDestination = (destination: ActivityDestination) => {
+  const acceptFix = useCallback(
+    (fix: TrackedLocation, loadInitialNearby: boolean) => {
+      const coords = coordsFromFix(fix);
+      activeCoordsRef.current = coords;
+      activeFixRef.current = fix;
+      setUserCoords(coords);
+      setLocationState('ready');
+      setLocationError(null);
+
+      if (!centeredInitialFixRef.current || !userMovedMapRef.current) {
+        cameraRef.current?.flyTo({ center: coords, zoom: 15.5, duration: 600 });
+        centeredInitialFixRef.current = true;
+      }
+
+      if (loadInitialNearby && !loadedInitialNearbyRef.current) {
+        loadedInitialNearbyRef.current = true;
+        loadNearby(coords, 1000).catch(() => {});
+      }
+      return coords;
+    },
+    [loadNearby],
+  );
+
+  const requestFreshFix = useCallback(async () => {
+    setLocationState('locating');
+    setLocationError(null);
+    try {
+      const fix = await requestCurrentLocation();
+      if (!validFix(fix)) {
+        throw new Error('ยังไม่ได้ตำแหน่ง GPS ที่แม่นยำ กรุณาลองใหม่ในที่โล่ง');
+      }
+      return acceptFix(fix, true);
+    } catch (error) {
+      const message = errorMessage(error, 'หาตำแหน่งปัจจุบันไม่สำเร็จ');
+      setLocationError(message);
+      setLocationState(message.includes('อนุญาต') ? 'denied' : 'error');
+      throw error;
+    }
+  }, [acceptFix, requestCurrentLocation]);
+
+  useEffect(() => {
+    if (validFix(locationFix)) {
+      acceptFix(locationFix, true);
+      return;
+    }
+    activeCoordsRef.current = null;
+    activeFixRef.current = null;
+    loadedInitialNearbyRef.current = false;
+    setUserCoords(null);
+    requestFreshFix().catch(() => {});
+  }, [acceptFix, locationFix, requestFreshFix]);
+
+  useEffect(
+    () => () => {
+      nearbyAbortRef.current?.abort();
+      searchAbortRef.current?.abort();
+      routeAbortRef.current?.abort();
+    },
+    [],
+  );
+
+  const ensureCoords = useCallback(async (): Promise<LngLat> => {
+    if (validFix(locationFix)) {
+      return acceptFix(locationFix, false);
+    }
+    if (
+      activeCoordsRef.current &&
+      validFix(activeFixRef.current) &&
+      locationState === 'ready'
+    ) {
+      return activeCoordsRef.current;
+    }
+    return requestFreshFix();
+  }, [acceptFix, locationFix, locationState, requestFreshFix]);
+
+  const handleRadiusChange = useCallback(
+    async (nextRadius: number) => {
+      setRadiusMeters(nextRadius);
+      setHasSearched(false);
+      setSearchResults([]);
+      setSearchError(null);
+      try {
+        const coords = await ensureCoords();
+        await loadNearby(coords, nextRadius);
+      } catch {
+        // Location status already explains the failure.
+      }
+    },
+    [ensureCoords, loadNearby],
+  );
+
+  const handleSearchSubmit = useCallback(async () => {
+    const query = searchText.trim();
+    if (!query) {
+      setHasSearched(false);
+      setSearchResults([]);
+      setSearchState('idle');
+      return;
+    }
+
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    const requestId = ++searchRequestIdRef.current;
+    setHasSearched(true);
+    setSearchState('loading');
+    setSearchError(null);
+    setSelectedPlace(null);
+    setRoutePreview(null);
+
+    try {
+      const coords = await ensureCoords();
+      const normalizedQuery = query.toLocaleLowerCase('th');
+      const inventoryMatches = nearbyPlaces.filter(place =>
+        `${place.name} ${place.displayName}`
+          .toLocaleLowerCase('th')
+          .includes(normalizedQuery),
+      );
+      const places =
+        inventoryMatches.length > 0
+          ? inventoryMatches
+          : await locationServices.searchPlaces(query, {
+              userCoords: coords,
+              radiusMeters,
+              signal: controller.signal,
+            });
+
+      if (requestId !== searchRequestIdRef.current) {
+        return;
+      }
+      const sorted = sortPlaces(places);
+      setSearchResults(sorted);
+      setSearchState(sorted.length > 0 ? 'ready' : 'empty');
+    } catch (error) {
+      if (requestId !== searchRequestIdRef.current || isAbortError(error)) {
+        return;
+      }
+      setSearchResults([]);
+      setSearchState('error');
+      setSearchError(errorMessage(error, 'ค้นหาสถานที่ไม่สำเร็จ'));
+    }
+  }, [ensureCoords, nearbyPlaces, radiusMeters, searchText]);
+
+  const requestRoute = useCallback(
+    async (place: osmLocationService.OsmPlace) => {
+      routeAbortRef.current?.abort();
+      const controller = new AbortController();
+      routeAbortRef.current = controller;
+      const requestId = ++routeRequestIdRef.current;
+      setRouteState('loading');
+      setRouteError(null);
+      setRoutePreview(null);
+
+      try {
+        const coords = await ensureCoords();
+        const route = await locationServices.getWalkingRoute(
+          coords,
+          place.coordinates,
+          controller.signal,
+        );
+        if (requestId !== routeRequestIdRef.current) {
+          return;
+        }
+        if (!validRoute(route)) {
+          setRouteState('error');
+          setRouteError('คำนวณเส้นทางเดินไม่ได้ ลองใหม่ หรือเริ่มโดยไม่มีเส้นทาง');
+          return;
+        }
+        setRoutePreview(route);
+        setRouteState('ready');
+        userMovedMapRef.current = true;
+        cameraRef.current?.fitBounds(routeBounds(route.coordinates), {
+          padding: { top: 180, right: 50, bottom: 250, left: 50 },
+          duration: 700,
+        });
+      } catch (error) {
+        if (requestId !== routeRequestIdRef.current || isAbortError(error)) {
+          return;
+        }
+        setRouteState('error');
+        setRouteError(errorMessage(error, 'คำนวณเส้นทางเดินไม่ได้ ลองใหม่'));
+      }
+    },
+    [ensureCoords],
+  );
+
+  const handleSelectPlace = useCallback(
+    (place: osmLocationService.OsmPlace) => {
+      setSelectedPlace(place);
+      setHasSearched(false);
+      userMovedMapRef.current = true;
+      cameraRef.current?.flyTo({ center: place.coordinates, zoom: 16, duration: 500 });
+      requestRoute(place).catch(() => {});
+    },
+    [requestRoute],
+  );
+
+  const handleRecenter = useCallback(async () => {
+    userMovedMapRef.current = false;
+    try {
+      const coords = await ensureCoords();
+      cameraRef.current?.flyTo({ center: coords, zoom: 16, duration: 500 });
+      setCurrentZoom(16);
+    } catch {
+      // Location status already explains the failure.
+    }
+  }, [ensureCoords]);
+
+  const displayedPlaces = hasSearched ? searchResults : nearbyPlaces;
+  const displayedState = hasSearched ? searchState : nearbyState;
+  const displayedError = hasSearched ? searchError : nearbyError;
+
+  const routeFeature = useMemo(
+    () =>
+      routePreview
+        ? {
+            type: 'Feature' as const,
+            properties: {},
+            geometry: {
+              type: 'LineString' as const,
+              coordinates: routePreview.coordinates,
+            },
+          }
+        : null,
+    [routePreview],
+  );
+
+  const startRecord = useCallback(() => {
+    if (!selectedPlace) {
+      return;
+    }
+    const destination: ActivityDestination = {
+      id: selectedPlace.id,
+      name: selectedPlace.name,
+      coordinates: selectedPlace.coordinates,
+      distanceMeters: routePreview?.distanceMeters,
+      routeCoordinates: routePreview?.coordinates,
+    };
     setSelectedDestination(destination);
     onStartRecord?.(destination);
-  };
-
-  const handleRecenter = () => {
-    if (userCoords) {
-      cameraRef.current?.flyTo({
-        center: userCoords,
-        zoom: 16,
-        duration: 600,
-      });
-      setCurrentZoom(16);
-    } else {
-      cameraRef.current?.flyTo({
-        center: DEFAULT_CENTER,
-        zoom: 14,
-        duration: 600,
-      });
-    }
-  };
-
-  const handleZoomIn = () => {
-    const nextZoom = Math.min(currentZoom + 1, 19);
-    setCurrentZoom(nextZoom);
-    cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
-  };
-
-  const handleZoomOut = () => {
-    const nextZoom = Math.max(currentZoom - 1, 10);
-    setCurrentZoom(nextZoom);
-    cameraRef.current?.zoomTo(nextZoom, { duration: 300 });
-  };
-
-  const renderBrandLogo = (brand: StoreMarker['brand']) => {
-    if (brand === 'amazon') {
-      return <AmazonLogo size={32} />;
-    }
-    if (brand === '7eleven') {
-      return <SevenElevenLogo size={32} />;
-    }
-    if (brand === 'inthanin') {
-      return <InthaninLogo size={32} />;
-    }
-    if (brand === 'kfc') {
-      return <KfcLogo size={32} />;
-    }
-    return (
-      <View style={styles.chulaPinLogo}>
-        <Text style={styles.chulaPinText}>🍰</Text>
-      </View>
-    );
-  };
+  }, [onStartRecord, routePreview, selectedPlace, setSelectedDestination]);
 
   return (
     <View style={styles.root}>
-      {/* Real Map Canvas Container */}
       <View style={styles.mapContainer}>
-        {!mapError ? (
-          <MapView
-            style={styles.mapView}
-            mapStyle={OSM_MAP_STYLE}
-            logo={false}
-            attribution={false}
-            onDidFailLoadingMap={() => setMapError(true)}
-          >
-            <Camera
-              ref={cameraRef}
-              initialViewState={{
-                center: cameraCenter,
-                zoom: hasGpsFix ? 15.5 : 14,
-              }}
-              center={cameraCenter}
-              zoom={currentZoom}
-              minZoom={OSM_CONFIG.minZoom}
-              maxZoom={OSM_CONFIG.maxZoom}
-            />
-
-            {/* Walking Route Preview Polyline (OSRM) */}
-            {routePreview && routePreview.coordinates.length > 1 && (
-              <GeoJSONSource
-                id="osm-route-preview-source"
-                data={{
-                  type: 'Feature',
-                  properties: {},
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: routePreview.coordinates,
-                  },
-                }}
-              >
-                <Layer
-                  id="osm-route-casing"
-                  type="line"
-                  style={ROUTE_PREVIEW_CASING_STYLE}
-                />
-                <Layer
-                  id="osm-route-line"
-                  type="line"
-                  style={ROUTE_PREVIEW_LINE_STYLE}
-                />
-              </GeoJSONSource>
-            )}
-
-            {/* Destination Marker (Real Search Result) */}
-            {selectedPlace && (
-              <Marker
-                id="selected-destination-marker"
-                lngLat={selectedPlace.coordinates}
-              >
-                <View style={styles.destinationPinCard}>
-                  <View style={styles.destinationPinHeader}>
-                    <Text style={styles.destinationPinFlag}>🏁</Text>
-                    <Text
-                      style={styles.destinationPinTitle}
-                      numberOfLines={1}
-                    >
-                      {selectedPlace.name}
-                    </Text>
-                  </View>
-                  <View style={styles.destinationPinNotch} />
-                </View>
-              </Marker>
-            )}
-
-            {/* Store Markers (Mock Partners) */}
-            {filteredStores.map((store) => {
-              const isSelected = selectedStore?.id === store.id;
-              return (
-                <Marker
-                  key={store.id}
-                  id={`marker-${store.id}`}
-                  lngLat={store.coordinates}
-                >
-                  <Pressable
-                    onPress={() => handleSelectStore(store)}
-                    style={[
-                      styles.storePinCard,
-                      isSelected && styles.storePinCardSelected,
-                    ]}
-                    hitSlop={10}
-                    accessibilityRole="button"
-                    accessibilityLabel={`หมุดร้าน ${store.name}`}
-                  >
-                    <View style={styles.pinLogoContainer}>
-                      {renderBrandLogo(store.brand)}
-                    </View>
-                    {store.hasCoupon && (
-                      <View style={styles.pinCouponPill}>
-                        <Text style={styles.pinCouponText}>คูปอง</Text>
-                      </View>
-                    )}
-                    <View
-                      style={[
-                        styles.pinNotch,
-                        isSelected && styles.pinNotchSelected,
-                      ]}
-                    />
-                  </Pressable>
-                </Marker>
-              );
-            })}
-
-            {/* User Cat Marker - Rendered ONLY when GPS fix is real */}
-            {hasGpsFix && userCoords && (
-              <Marker id="user-cat-marker" lngLat={userCoords}>
-                <View style={styles.userMarkerWrap}>
-                  <View style={styles.userSpeechBubble}>
-                    <Text style={styles.userSpeechText}>
-                      เมี้ยว~ วันนี้แวะร้านไหนดี?
-                    </Text>
-                    <View style={styles.userSpeechTail} />
-                  </View>
-                  <View style={styles.userCatCard}>
-                    <CatAvatar size={50} mood="sit" />
-                  </View>
-                  <View style={styles.userRadarHalo}>
-                    <View style={styles.userCenterDot} />
-                  </View>
-                </View>
-              </Marker>
-            )}
-          </MapView>
-        ) : (
-          <View style={styles.offlineFallbackContainer}>
-            <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-              <Rect x="0" y="0" width="100%" height="100%" fill="#F5F2E9" />
-              <Rect x="20" y="80" width="120" height="90" rx="8" fill="#EBF2E5" />
-              <Rect x="220" y="60" width="140" height="110" rx="8" fill="#EBF2E5" />
-              <Rect x="15" y="240" width="150" height="130" rx="8" fill="#EBF2E5" />
-              <Rect x="210" y="220" width="160" height="150" rx="8" fill="#EBF2E5" />
-              <Line x1="-20" y1="120" x2="420" y2="480" stroke="#FFFFFF" strokeWidth={26} />
-              <Line x1="180" y1="-20" x2="180" y2="800" stroke="#FFFFFF" strokeWidth={20} />
-              <Line x1="-20" y1="380" x2="420" y2="380" stroke="#FFFFFF" strokeWidth={22} />
-            </Svg>
-            <View style={styles.offlineNoticeCard}>
-              <Text style={styles.offlineNoticeTitle}>โหมดออฟไลน์</Text>
-              <Text style={styles.offlineNoticeBody}>
-                ไม่สามารถโหลดแผนที่ OSM ได้ในขณะนี้ โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Visible OSM Attribution Pill (Required by OSM Policy) */}
-      <View style={styles.osmAttributionPill} pointerEvents="none">
-        <Text style={styles.osmAttributionText}>{OSM_CONFIG.attribution}</Text>
-      </View>
-
-      {/* GPS Status Indicator when searching/waiting for GPS */}
-      {!hasGpsFix && (
-        <Pressable
-          onPress={() => {
-            requestLocationPermission().catch(() => {});
+        <MapView
+          key={mapKey}
+          style={styles.map}
+          mapStyle={OSM_MAP_STYLE}
+          logo={false}
+          attribution={false}
+          onDidFailLoadingMap={() => setTileError(true)}
+          onDidFinishLoadingMap={() => setTileError(false)}
+          onRegionWillChange={event => {
+            if (event.nativeEvent.userInteraction) {
+              userMovedMapRef.current = true;
+            }
           }}
-          style={styles.gpsPendingPill}
-          accessibilityRole="button"
-          accessibilityLabel="ขออนุญาตระบุตำแหน่งของคุณ"
-          hitSlop={8}
+          onRegionDidChange={event => {
+            if (Number.isFinite(event.nativeEvent.zoom)) {
+              setCurrentZoom(event.nativeEvent.zoom);
+            }
+          }}
         >
-          <ActivityIndicator size="small" color="#D97706" />
-          <Text style={styles.gpsPendingText}>
-            📍 ขออนุญาตจับตำแหน่งผู้ใช้ (แตะเพื่ออนุญาต)
-          </Text>
-        </Pressable>
-      )}
+          <Camera
+            ref={cameraRef}
+            initialViewState={{
+              center: userCoords ?? WORLD_CENTER,
+              zoom: userCoords ? 15.5 : 2,
+            }}
+            minZoom={OSM_CONFIG.minZoom}
+            maxZoom={OSM_CONFIG.maxZoom}
+          />
 
-      {/* Floating Top Controls (Header, Search, Filters) */}
-      <View style={styles.topOverlay} pointerEvents="box-none">
-        {/* Header Row */}
+          {routeFeature && (
+            <GeoJSONSource id="walking-route" data={routeFeature}>
+              <Layer id="walking-route-casing" type="line" style={ROUTE_CASING_STYLE} />
+              <Layer id="walking-route-line" type="line" style={ROUTE_STYLE} />
+            </GeoJSONSource>
+          )}
+
+          {displayedPlaces.map(place => (
+            <Marker key={place.id} id={`place-${place.id}`} lngLat={place.coordinates}>
+              <Pressable
+                onPress={() => handleSelectPlace(place)}
+                accessibilityRole="button"
+                accessibilityLabel={`เลือก ${place.name}`}
+                style={[
+                  styles.placeMarker,
+                  selectedPlace?.id === place.id && styles.placeMarkerSelected,
+                ]}
+              >
+                <Text style={styles.placeMarkerText}>●</Text>
+              </Pressable>
+            </Marker>
+          ))}
+
+          {selectedPlace && !displayedPlaces.some(place => place.id === selectedPlace.id) && (
+            <Marker id="selected-place" lngLat={selectedPlace.coordinates}>
+              <View style={[styles.placeMarker, styles.placeMarkerSelected]}>
+                <Text style={styles.placeMarkerText}>●</Text>
+              </View>
+            </Marker>
+          )}
+
+          {userCoords && locationState === 'ready' && (
+            <Marker id="user-location" lngLat={userCoords}>
+              <View style={styles.userMarker}>
+                <CatAvatar size={46} mood="sit" />
+                <View style={styles.userDot} />
+              </View>
+            </Marker>
+          )}
+        </MapView>
+      </View>
+
+      <View style={styles.topPanel} pointerEvents="box-none">
         <View style={styles.headerRow}>
+          <Pressable onPress={onBack} style={styles.backButton} accessibilityRole="button">
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
+          <Text style={styles.title}>ร้านใกล้ฉัน</Text>
           <Pressable
-            onPress={onBack}
+            onPress={handleRecenter}
+            style={styles.recenterButton}
             accessibilityRole="button"
-            accessibilityLabel="ย้อนกลับ"
-            hitSlop={12}
-            style={styles.backButton}
+            accessibilityLabel="กลับไปตำแหน่งของฉัน"
           >
-            <Text style={styles.backArrow}>‹</Text>
-            <Text style={styles.headerTitle}>สำรวจแผนที่ OSM</Text>
+            <Text style={styles.recenterText}>◎</Text>
           </Pressable>
         </View>
 
-        {/* Real Geocoding Search Bar */}
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="ค้นหาสถานที่จริง (เช่น สยาม, สวนลุม, จุฬา)"
-            placeholderTextColor="#8A8F85"
             value={searchText}
             onChangeText={setSearchText}
             onSubmitEditing={handleSearchSubmit}
             returnKeyType="search"
+            placeholder="ค้นหาสถานที่เมื่อกดค้นหา"
+            placeholderTextColor="#858B80"
           />
-          {searchText.length > 0 && (
-            <Pressable
-              onPress={() => {
-                setSearchText('');
-                setSearchResults([]);
-                setHasSearched(false);
-              }}
-              hitSlop={8}
-            >
-              <Text style={styles.clearSearchIcon}>✕</Text>
-            </Pressable>
-          )}
           <Pressable
             onPress={handleSearchSubmit}
-            style={styles.searchSubmitBtn}
-            disabled={isSearching}
+            disabled={searchState === 'loading'}
+            style={styles.searchButton}
+            accessibilityRole="button"
           >
-            {isSearching ? (
+            {searchState === 'loading' ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.searchSubmitBtnText}>ค้นหา</Text>
+              <Text style={styles.searchButtonText}>ค้นหา</Text>
             )}
           </Pressable>
         </View>
 
-        {/* Search Results Dropdown List */}
-        {hasSearched && (
-          <View style={styles.searchResultsBox}>
-            {isSearching ? (
-              <View style={styles.searchStatusRow}>
-                <ActivityIndicator size="small" color="#374B2A" />
-                <Text style={styles.searchStatusText}>
-                  กำลังค้นหาสถานที่จาก OSM...
-                </Text>
-              </View>
-            ) : searchError ? (
-              <View style={styles.searchStatusRow}>
-                <Text style={styles.searchErrorText}>⚠️ {searchError}</Text>
-                <Pressable
-                  onPress={handleSearchSubmit}
-                  style={styles.retrySearchBtn}
-                >
-                  <Text style={styles.retrySearchText}>ลองใหม่</Text>
-                </Pressable>
-              </View>
-            ) : searchResults.length === 0 ? (
-              <View style={styles.searchStatusRow}>
-                <Text style={styles.searchEmptyText}>
-                  ไม่พบสถานที่ที่ตรงกับคำค้นหา
-                </Text>
-              </View>
-            ) : (
-              <ScrollView
-                style={styles.searchResultsScroll}
-                keyboardShouldPersistTaps="handled"
+        <View style={styles.radiusRow}>
+          {RADII.map(value => (
+            <Pressable
+              key={value}
+              onPress={() => handleRadiusChange(value)}
+              style={[
+                styles.radiusButton,
+                value === radiusMeters && styles.radiusButtonActive,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: value === radiusMeters }}
+            >
+              <Text
+                style={[
+                  styles.radiusText,
+                  value === radiusMeters && styles.radiusTextActive,
+                ]}
               >
-                {searchResults.map((place) => (
-                  <Pressable
-                    key={place.id}
-                    onPress={() => handleSelectSearchResult(place)}
-                    style={styles.searchResultItem}
-                  >
-                    <Text style={styles.searchResultPin}>
-                      {place.id.startsWith('store-') ? '🏪' : '📍'}
-                    </Text>
-                    <View style={styles.searchResultInfo}>
-                      <View style={styles.searchResultNameRow}>
-                        <Text
-                          style={styles.searchResultName}
-                          numberOfLines={1}
-                        >
-                          {place.name}
-                        </Text>
-                        {place.distanceMeters !== undefined && (
-                          <View style={styles.searchResultDistPill}>
-                            <Text style={styles.searchResultDistText}>
-                              {formatDistance(place.distanceMeters)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text
-                        style={styles.searchResultAddress}
-                        numberOfLines={1}
-                      >
-                        {place.displayName}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </ScrollView>
+                {radiusLabel(value)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {locationState !== 'ready' && (
+          <View style={styles.statusCard}>
+            {locationState === 'locating' && <ActivityIndicator color="#D97706" />}
+            <View style={styles.statusCopy}>
+              <Text style={styles.statusTitle}>
+                {locationState === 'locating'
+                  ? 'กำลังหาตำแหน่งปัจจุบัน'
+                  : locationState === 'denied'
+                    ? 'ยังไม่ได้สิทธิ์ตำแหน่ง'
+                    : 'GPS ยังไม่พร้อม'}
+              </Text>
+              {locationError && <Text style={styles.statusBody}>{locationError}</Text>}
+            </View>
+            {locationState !== 'locating' && (
+              <Pressable onPress={() => requestFreshFix().catch(() => {})}>
+                <Text style={styles.retryText}>ลองใหม่</Text>
+              </Pressable>
             )}
           </View>
         )}
 
-        {/* Filter Pills Row for partner stores */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersRow}
-        >
-          {FILTERS.map((f) => {
-            const active = f === filter;
-            return (
-              <Pressable
-                key={f}
-                onPress={() => setFilter(f)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[
-                  styles.filterPill,
-                  active ? styles.filterPillActive : styles.filterPillInactive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    active ? styles.filterTextActive : styles.filterTextInactive,
-                  ]}
-                >
-                  {f}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Floating Map Utility Buttons (Recenter & Zoom) */}
-      <View style={styles.mapControlsColumn}>
-        <Pressable
-          onPress={handleRecenter}
-          accessibilityRole="button"
-          accessibilityLabel="จัดตำแหน่งกึ่งกลาง"
-          style={styles.mapFloatingBtn}
-        >
-          <Svg
-            width={20}
-            height={20}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#262A22"
-            strokeWidth={2.2}
-          >
-            <Circle cx="12" cy="12" r="8" />
-            <Line x1="12" y1="2" x2="12" y2="6" strokeLinecap="round" />
-            <Line x1="12" y1="18" x2="12" y2="22" strokeLinecap="round" />
-            <Line x1="2" y1="12" x2="6" y2="12" strokeLinecap="round" />
-            <Line x1="18" y1="12" x2="22" y2="12" strokeLinecap="round" />
-            <Circle cx="12" cy="12" r="2.5" fill="#38A169" />
-          </Svg>
-        </Pressable>
-
-        <Pressable
-          onPress={handleZoomIn}
-          accessibilityRole="button"
-          accessibilityLabel="ซูมเข้า"
-          style={styles.mapFloatingBtn}
-        >
-          <Svg
-            width={18}
-            height={18}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#262A22"
-            strokeWidth={2.5}
-          >
-            <Path d="M12 5v14M5 12h14" strokeLinecap="round" />
-          </Svg>
-        </Pressable>
-
-        <Pressable
-          onPress={handleZoomOut}
-          accessibilityRole="button"
-          accessibilityLabel="ซูมออก"
-          style={styles.mapFloatingBtn}
-        >
-          <Svg
-            width={18}
-            height={18}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#262A22"
-            strokeWidth={2.5}
-          >
-            <Path d="M5 12h14" strokeLinecap="round" />
-          </Svg>
-        </Pressable>
-      </View>
-
-      {/* Destination Card with Route Preview & "ไปกันเลย" Button */}
-      {selectedPlace && (
-        <View style={styles.bottomOverlay}>
-          <View style={styles.destinationCard}>
-            <View style={styles.destHeaderRow}>
-              <View style={styles.destIconBox}>
-                <Text style={styles.destIcon}>📍</Text>
-              </View>
-              <View style={styles.destInfo}>
-                <Text style={styles.destTitle} numberOfLines={1}>
-                  {selectedPlace.name}
-                </Text>
-                <Text style={styles.destSubtitle} numberOfLines={2}>
-                  {selectedPlace.displayName}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => {
-                  setSelectedPlace(null);
-                  setRoutePreview(null);
-                  setRoutingError(null);
-                }}
-                hitSlop={10}
-                style={styles.previewCloseBtn}
-              >
-                <Text style={styles.previewCloseText}>✕</Text>
-              </Pressable>
+        {tileError && (
+          <View style={styles.tileErrorCard}>
+            <View style={styles.statusCopy}>
+              <Text style={styles.statusTitle}>โหลดภาพแผนที่ไม่ได้</Text>
+              <Text style={styles.statusBody}>GPS และรายการร้านยังทำงานแยกจากภาพแผนที่</Text>
             </View>
-
-            {/* Route preview stats */}
-            {routingLoading ? (
-              <View style={styles.routingLoadingRow}>
-                <ActivityIndicator size="small" color="#2563EB" />
-                <Text style={styles.routingLoadingText}>
-                  กำลังคำนวณเส้นทางเดินจาก OSM...
-                </Text>
-              </View>
-            ) : routePreview ? (
-              <View style={styles.routeStatsRow}>
-                <View style={styles.routeStatPill}>
-                  <Text style={styles.routeStatLabel}>ระยะทางเดิน</Text>
-                  <Text style={styles.routeStatValue}>
-                    {(routePreview.distanceMeters / 1000).toFixed(2)} km
-                  </Text>
-                </View>
-                <View style={styles.routeStatPill}>
-                  <Text style={styles.routeStatLabel}>ประมาณเวลา</Text>
-                  <Text style={styles.routeStatValue}>
-                    {Math.max(1, Math.round(routePreview.durationSeconds / 60))}{' '}
-                    นาที
-                  </Text>
-                </View>
-              </View>
-            ) : routingError ? (
-              <View style={styles.routingErrorRow}>
-                <Text style={styles.routingErrorText}>ℹ️ {routingError}</Text>
-              </View>
-            ) : null}
-
-            {/* Big "ไปกันเลย" Button */}
             <Pressable
-              onPress={() =>
-                handleGoToDestination({
-                  id: selectedPlace.id,
-                  name: selectedPlace.name,
-                  coordinates: selectedPlace.coordinates,
-                  distanceMeters: routePreview?.distanceMeters,
-                  routeCoordinates: routePreview?.coordinates,
-                })
-              }
-              style={({ pressed }) => [
-                styles.goBtn,
-                pressed && styles.btnPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`ไปกันเลยที่ ${selectedPlace.name}`}
+              onPress={() => {
+                setTileError(false);
+                setMapKey(value => value + 1);
+              }}
             >
-              <Text style={styles.goBtnText}>ไปกันเลย 🐾</Text>
+              <Text style={styles.retryText}>โหลดแผนที่ใหม่</Text>
             </Pressable>
           </View>
-        </View>
-      )}
+        )}
+      </View>
 
-      {/* Bottom Floating Store Preview Card (Mock Store) */}
-      {selectedStore && !selectedPlace && (
-        <View style={styles.bottomOverlay}>
-          <View style={styles.previewCard}>
-            <View style={styles.previewTopRow}>
-              <View style={styles.previewLogoBox}>
-                <Image
-                  source={selectedStore.image}
-                  style={styles.previewLogoImage}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={styles.previewInfo}>
-                <Text style={styles.previewTitle} numberOfLines={1}>
-                  {selectedStore.name}
-                </Text>
-                <Text style={styles.previewBranch} numberOfLines={1}>
-                  {selectedStore.branch}
-                </Text>
-                <View style={styles.previewMetaRow}>
-                  <Text style={styles.previewDistance}>
-                    📍 {selectedStore.distance}
-                  </Text>
-                  <Text style={styles.previewRating}>
-                    ⭐ {selectedStore.rating}
-                  </Text>
-                </View>
-              </View>
+      <View style={styles.zoomColumn}>
+        <Pressable
+          onPress={() => {
+            const zoom = Math.min(19, currentZoom + 1);
+            setCurrentZoom(zoom);
+            cameraRef.current?.zoomTo(zoom, { duration: 250 });
+          }}
+          style={styles.zoomButton}
+          accessibilityLabel="ซูมเข้า"
+        >
+          <Text style={styles.zoomText}>+</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            const zoom = Math.max(2, currentZoom - 1);
+            setCurrentZoom(zoom);
+            cameraRef.current?.zoomTo(zoom, { duration: 250 });
+          }}
+          style={styles.zoomButton}
+          accessibilityLabel="ซูมออก"
+        >
+          <Text style={styles.zoomText}>−</Text>
+        </Pressable>
+      </View>
+
+      {!selectedPlace && locationState === 'ready' && (
+        <View style={styles.resultsPanel}>
+          <View style={styles.resultsHeader}>
+            <View style={styles.statusCopy}>
+              <Text style={styles.resultsTitle}>
+                {hasSearched ? 'ผลการค้นหา' : `ร้านที่พบใน ${radiusLabel(radiusMeters)}`}
+              </Text>
+              <Text style={styles.resultsCaption}>
+                ใกล้ที่สุดจากรายการที่พบใน OSM · ระยะเส้นตรง
+              </Text>
+            </View>
+            {hasSearched && (
               <Pressable
                 onPress={() => {
-                  setSelectedStore(null);
-                  setRoutePreview(null);
+                  searchAbortRef.current?.abort();
+                  setHasSearched(false);
+                  setSearchText('');
+                  setSearchResults([]);
                 }}
-                hitSlop={10}
-                style={styles.previewCloseBtn}
               >
-                <Text style={styles.previewCloseText}>✕</Text>
+                <Text style={styles.clearText}>ล้าง</Text>
               </Pressable>
-            </View>
-
-            {selectedStore.hasCoupon && selectedStore.couponText && (
-              <View style={styles.previewCouponRow}>
-                <Text style={styles.previewCouponIcon}>🎟️</Text>
-                <Text style={styles.previewCouponText} numberOfLines={1}>
-                  {selectedStore.couponText}
-                </Text>
-              </View>
             )}
+          </View>
 
-            <View style={styles.storeBtnRow}>
+          {displayedState === 'loading' ? (
+            <View style={styles.centerStatus}>
+              <ActivityIndicator color="#374B2A" />
+              <Text style={styles.statusBody}>
+                {hasSearched ? 'กำลังค้นหาสถานที่' : 'กำลังค้นหาร้านใกล้ตัว'}
+              </Text>
+            </View>
+          ) : displayedState === 'error' ? (
+            <View style={styles.centerStatus}>
+              <Text style={styles.errorText}>{displayedError}</Text>
               <Pressable
-                onPress={() => onOpenStore(selectedStore.id)}
-                style={({ pressed }) => [
-                  styles.detailBtn,
-                  pressed && styles.btnPressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`ดูรายละเอียดร้าน ${selectedStore.name}`}
+                onPress={hasSearched ? handleSearchSubmit : () => {
+                  const coords = activeCoordsRef.current;
+                  if (coords) {
+                    loadNearby(coords, radiusMeters).catch(() => {});
+                  }
+                }}
               >
-                <Text style={styles.detailBtnText}>ดูร้านค้า</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() =>
-                  handleGoToDestination({
-                    id: selectedStore.id,
-                    name: `${selectedStore.name} ${selectedStore.branch}`,
-                    coordinates: selectedStore.coordinates,
-                    distanceMeters: routePreview?.distanceMeters,
-                    routeCoordinates: routePreview?.coordinates,
-                  })
-                }
-                style={({ pressed }) => [
-                  styles.goStoreBtn,
-                  pressed && styles.btnPressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`ไปกันเลยที่ ${selectedStore.name}`}
-              >
-                <Text style={styles.goStoreBtnText}>ไปกันเลย 🐾</Text>
+                <Text style={styles.retryText}>ลองใหม่</Text>
               </Pressable>
             </View>
-          </View>
+          ) : displayedState === 'empty' ? (
+            <View style={styles.centerStatus}>
+              <Text style={styles.emptyText}>
+                {hasSearched
+                  ? 'ไม่พบสถานที่ที่ตรงกับคำค้นหา'
+                  : `ไม่พบร้านในรัศมี ${radiusLabel(radiusMeters)}`}
+              </Text>
+              {!hasSearched && radiusMeters < 5000 && (
+                <Text style={styles.statusBody}>เลือก 3 หรือ 5 กม. เพื่อขยายพื้นที่</Text>
+              )}
+            </View>
+          ) : (
+            <ScrollView style={styles.resultsList} keyboardShouldPersistTaps="handled">
+              {displayedPlaces.map(place => (
+                <Pressable
+                  key={place.id}
+                  onPress={() => handleSelectPlace(place)}
+                  style={styles.resultRow}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.resultPin}>
+                    <Text>●</Text>
+                  </View>
+                  <View style={styles.resultCopy}>
+                    <Text style={styles.resultName} numberOfLines={1}>{place.name}</Text>
+                    <Text style={styles.resultAddress} numberOfLines={1}>{place.displayName}</Text>
+                  </View>
+                  {place.distanceMeters !== undefined && (
+                    <View style={styles.distancePill}>
+                      <Text style={styles.distanceText}>
+                        {locationServices.formatDistance(place.distanceMeters)}
+                      </Text>
+                      <Text style={styles.straightText}>เส้นตรง</Text>
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
         </View>
       )}
+
+      {selectedPlace && (
+        <View style={styles.destinationPanel}>
+          <View style={styles.destinationHeader}>
+            <View style={styles.statusCopy}>
+              <Text style={styles.destinationTitle}>{selectedPlace.name}</Text>
+              <Text style={styles.destinationAddress} numberOfLines={2}>{selectedPlace.displayName}</Text>
+              {selectedPlace.distanceMeters !== undefined && (
+                <Text style={styles.straightDistance}>
+                  ระยะเส้นตรง {locationServices.formatDistance(selectedPlace.distanceMeters)}
+                </Text>
+              )}
+            </View>
+            <Pressable
+              onPress={() => {
+                routeAbortRef.current?.abort();
+                setSelectedPlace(null);
+                setRoutePreview(null);
+                setRouteState('idle');
+              }}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeText}>×</Text>
+            </Pressable>
+          </View>
+
+          {routeState === 'loading' && (
+            <View style={styles.routeStatus}>
+              <ActivityIndicator color="#2563EB" />
+              <Text style={styles.routeStatusText}>กำลังคำนวณเส้นทางเดิน</Text>
+            </View>
+          )}
+          {routeState === 'ready' && routePreview && (
+            <View style={styles.routeStats}>
+              <View style={styles.routeStat}>
+                <Text style={styles.routeStatLabel}>ระยะทางเดิน</Text>
+                <Text style={styles.routeStatValue}>
+                  {(routePreview.distanceMeters / 1000).toFixed(2)} กม.
+                </Text>
+              </View>
+              <View style={styles.routeStat}>
+                <Text style={styles.routeStatLabel}>เวลาเดินโดยประมาณ</Text>
+                <Text style={styles.routeStatValue}>
+                  {Math.max(1, Math.round(routePreview.durationSeconds / 60))} นาที
+                </Text>
+              </View>
+            </View>
+          )}
+          {routeState === 'error' && (
+            <View style={styles.routeError}>
+              <Text style={styles.errorText}>{routeError}</Text>
+              <Pressable onPress={() => requestRoute(selectedPlace)}>
+                <Text style={styles.retryText}>ลองเส้นทางใหม่</Text>
+              </Pressable>
+            </View>
+          )}
+
+          <Pressable onPress={startRecord} style={styles.goButton} accessibilityRole="button">
+            <Text style={styles.goButtonText}>ไปกันเลย</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Pressable
+        onPress={() => Linking.openURL(OSM_CONFIG.attributionUrl)}
+        style={styles.attribution}
+        accessibilityRole="link"
+      >
+        <Text style={styles.attributionText}>{OSM_CONFIG.attribution}</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#FAF7EE',
-  },
-  mapContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-  },
-  mapView: {
-    flex: 1,
-  },
-
-  // Attribution Pill
-  osmAttributionPill: {
-    position: 'absolute',
-    bottom: 80,
-    left: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    zIndex: 10,
-  },
-  osmAttributionText: {
-    fontSize: 10,
-    color: '#4A5568',
-    fontWeight: '600',
-  },
-
-  // GPS Pending Indicator
-  gpsPendingPill: {
-    position: 'absolute',
-    top: 140,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FEF3C7',
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#FCD34D',
-    zIndex: 20,
-    elevation: 4,
-  },
-  gpsPendingText: {
-    fontSize: 11,
-    color: '#92400E',
-    fontWeight: '700',
-  },
-
-  // Offline Fallback
-  offlineFallbackContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  offlineNoticeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 30,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    elevation: 4,
-  },
-  offlineNoticeTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#262A22',
-    marginBottom: 6,
-  },
-  offlineNoticeBody: {
-    fontSize: 13,
-    color: '#656D5F',
-    textAlign: 'center',
-  },
-
-  // Destination Marker
-  destinationPinCard: {
-    alignItems: 'center',
-  },
-  destinationPinHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E3A8A',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 4,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    elevation: 6,
-  },
-  destinationPinFlag: {
-    fontSize: 14,
-  },
-  destinationPinTitle: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-    maxWidth: 140,
-  },
-  destinationPinNotch: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#1E3A8A',
-  },
-
-  // Store Pin
-  storePinCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 3,
-    borderWidth: 2,
-    borderColor: '#ECE4D8',
-    elevation: 5,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-  },
-  storePinCardSelected: {
-    borderColor: '#374B2A',
-    transform: [{ scale: 1.12 }],
-    zIndex: 30,
-  },
-  pinLogoContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chulaPinLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chulaPinText: {
-    fontSize: 20,
-  },
-  pinCouponPill: {
-    position: 'absolute',
-    top: -7,
-    right: -7,
-    backgroundColor: '#E53E3E',
-    borderRadius: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  pinCouponText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '800',
-  },
-  pinNotch: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#ECE4D8',
-    marginTop: 2,
-  },
-  pinNotchSelected: {
-    borderTopColor: '#374B2A',
-  },
-
-  // User Marker
-  userMarkerWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userSpeechBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1.5,
-    borderColor: '#ECE4D8',
-    marginBottom: 4,
-    elevation: 3,
-  },
-  userSpeechText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#374B2A',
-  },
-  userSpeechTail: {
-    position: 'absolute',
-    bottom: -5,
-    alignSelf: 'center',
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 5,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#ECE4D8',
-  },
-  userCatCard: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FAF7EE',
-    borderWidth: 2.5,
-    borderColor: '#374B2A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-  },
-  userRadarHalo: {
-    position: 'absolute',
-    bottom: -4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(56, 161, 105, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userCenterDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#38A169',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-
-  // Top Overlay
-  topOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    zIndex: 25,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderWidth: 1.2,
-    borderColor: '#ECE4D8',
-    elevation: 3,
-  },
-  backArrow: {
-    fontSize: 22,
-    color: '#262A22',
-    marginRight: 6,
-    lineHeight: 24,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#262A22',
-  },
-
-  // Search Bar
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderWidth: 1.5,
-    borderColor: '#ECE4D8',
-    elevation: 4,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#262A22',
-    paddingVertical: 8,
-  },
-  clearSearchIcon: {
-    fontSize: 14,
-    color: '#8A8F85',
-    paddingHorizontal: 6,
-  },
-  searchSubmitBtn: {
-    backgroundColor: '#374B2A',
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginLeft: 4,
-  },
-  searchSubmitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Search Results Dropdown
-  searchResultsBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    marginTop: 6,
-    maxHeight: 220,
-    borderWidth: 1.5,
-    borderColor: '#ECE4D8',
-    elevation: 8,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    overflow: 'hidden',
-  },
-  searchResultsScroll: {
-    maxHeight: 200,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3EFE6',
-  },
-  searchResultPin: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  searchResultInfo: {
-    flex: 1,
-  },
-  searchResultName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#262A22',
-    flex: 1,
-  },
-  searchResultNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  searchResultDistPill: {
-    backgroundColor: '#EBF2E5',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderWidth: 1,
-    borderColor: '#D4E3CC',
-  },
-  searchResultDistText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#374B2A',
-  },
-  searchResultAddress: {
-    fontSize: 11,
-    color: '#656D5F',
-    marginTop: 2,
-  },
-  searchStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    gap: 8,
-  },
-  searchStatusText: {
-    fontSize: 12,
-    color: '#656D5F',
-    fontWeight: '600',
-  },
-  searchEmptyText: {
-    fontSize: 12,
-    color: '#8A8F85',
-    fontStyle: 'italic',
-  },
-  searchErrorText: {
-    fontSize: 12,
-    color: '#DC2626',
-    flex: 1,
-  },
-  retrySearchBtn: {
-    backgroundColor: '#F3EFE6',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  retrySearchText: {
-    fontSize: 12,
-    color: '#374B2A',
-    fontWeight: '700',
-  },
-
-  // Filter Pills
-  filtersRow: {
-    flexDirection: 'row',
-    paddingVertical: 10,
-    gap: 8,
-  },
-  filterPill: {
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderWidth: 1.2,
-    elevation: 2,
-  },
-  filterPillActive: {
-    backgroundColor: '#374B2A',
-    borderColor: '#374B2A',
-  },
-  filterPillInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderColor: '#ECE4D8',
-  },
-  filterText: {
-    fontSize: 12,
-  },
-  filterTextActive: {
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  filterTextInactive: {
-    fontWeight: '600',
-    color: '#656D5F',
-  },
-
-  // Map Controls
-  mapControlsColumn: {
-    position: 'absolute',
-    right: 16,
-    top: 200,
-    gap: 10,
-    zIndex: 15,
-  },
-  mapFloatingBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#ECE4D8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-  },
-
-  // Bottom Overlay & Destination Card
-  bottomOverlay: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    zIndex: 30,
-  },
-  destinationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#ECE4D8',
-    elevation: 8,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    gap: 12,
-  },
-  destHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  destIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.2,
-    borderColor: '#BFDBFE',
-  },
-  destIcon: {
-    fontSize: 22,
-  },
-  destInfo: {
-    flex: 1,
-  },
-  destTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#262A22',
-  },
-  destSubtitle: {
-    fontSize: 11,
-    color: '#656D5F',
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  routingLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  routingLoadingText: {
-    fontSize: 12,
-    color: '#1E40AF',
-    fontWeight: '600',
-  },
-  routeStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  routeStatPill: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-  },
-  routeStatLabel: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  routeStatValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1E3A8A',
-    marginTop: 2,
-  },
-  routingErrorRow: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  routingErrorText: {
-    fontSize: 11,
-    color: '#92400E',
-    fontWeight: '600',
-  },
-  goBtn: {
-    backgroundColor: '#374B2A',
-    borderRadius: radius.pill,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  // Store Preview Card
-  previewCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#ECE4D8',
-    elevation: 8,
-    shadowColor: '#262A22',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    gap: 12,
-  },
-  previewTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  previewLogoBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: '#F3EFE6',
-  },
-  previewLogoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  previewInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  previewTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#262A22',
-  },
-  previewBranch: {
-    fontSize: 12,
-    color: '#656D5F',
-    fontWeight: '600',
-  },
-  previewMetaRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 2,
-  },
-  previewDistance: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#374B2A',
-  },
-  previewRating: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  previewCloseBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F3EFE6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewCloseText: {
-    fontSize: 13,
-    color: '#656D5F',
-    fontWeight: '700',
-  },
-  previewCouponRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#FCD34D',
-  },
-  previewCouponIcon: {
-    fontSize: 14,
-  },
-  previewCouponText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#92400E',
-  },
-  storeBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  detailBtn: {
-    flex: 1,
-    backgroundColor: '#F3EFE6',
-    borderRadius: radius.pill,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailBtnText: {
-    color: '#374B2A',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  goStoreBtn: {
-    flex: 1,
-    backgroundColor: '#374B2A',
-    borderRadius: radius.pill,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goStoreBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  btnPressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.99 }],
-  },
+  root: { flex: 1, backgroundColor: '#F7F4EB' },
+  mapContainer: { ...StyleSheet.absoluteFill },
+  map: { flex: 1 },
+  topPanel: { position: 'absolute', top: 0, left: 0, right: 0, padding: 14, gap: 8, zIndex: 20 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 3 },
+  backText: { fontSize: 28, lineHeight: 30, color: '#262A22' },
+  title: { fontSize: 18, fontWeight: '800', color: '#262A22', backgroundColor: 'rgba(255,255,255,0.94)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill },
+  recenterButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 3 },
+  recenterText: { fontSize: 24, color: '#374B2A', fontWeight: '800' },
+  searchBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 5, borderWidth: 1, borderColor: '#E4DED2', elevation: 4 },
+  searchInput: { flex: 1, color: '#262A22', fontSize: 14, paddingHorizontal: 12, paddingVertical: 8 },
+  searchButton: { minWidth: 72, backgroundColor: '#374B2A', borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  searchButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+  radiusRow: { flexDirection: 'row', alignSelf: 'center', gap: 8 },
+  radiusButton: { backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: radius.pill, borderWidth: 1, borderColor: '#D9D2C5', paddingHorizontal: 15, paddingVertical: 7 },
+  radiusButtonActive: { backgroundColor: '#374B2A', borderColor: '#374B2A' },
+  radiusText: { color: '#5F665A', fontSize: 12, fontWeight: '700' },
+  radiusTextActive: { color: '#FFFFFF' },
+  statusCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF7D6', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#F5D46B' },
+  tileErrorCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEECE7', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#F5B9A8' },
+  statusCopy: { flex: 1 },
+  statusTitle: { color: '#262A22', fontSize: 13, fontWeight: '800' },
+  statusBody: { color: '#666D61', fontSize: 11, marginTop: 2, lineHeight: 15 },
+  retryText: { color: '#1D5D43', fontSize: 12, fontWeight: '800' },
+  zoomColumn: { position: 'absolute', right: 14, top: 210, gap: 8, zIndex: 10 },
+  zoomButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 3 },
+  zoomText: { fontSize: 24, color: '#262A22', fontWeight: '600' },
+  resultsPanel: { position: 'absolute', left: 14, right: 14, bottom: 26, maxHeight: 300, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#E4DED2', elevation: 8, zIndex: 25 },
+  resultsHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  resultsTitle: { color: '#262A22', fontSize: 15, fontWeight: '800' },
+  resultsCaption: { color: '#747A70', fontSize: 10, marginTop: 2 },
+  clearText: { color: '#9B4B3C', fontSize: 12, fontWeight: '800' },
+  centerStatus: { minHeight: 84, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
+  errorText: { color: '#B42318', fontSize: 12, textAlign: 'center', lineHeight: 17 },
+  emptyText: { color: '#535A50', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  resultsList: { maxHeight: 220 },
+  resultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F1EDE5' },
+  resultPin: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#EBF2E5', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  resultCopy: { flex: 1 },
+  resultName: { color: '#262A22', fontSize: 13, fontWeight: '800' },
+  resultAddress: { color: '#72786E', fontSize: 10, marginTop: 2 },
+  distancePill: { alignItems: 'flex-end', marginLeft: 8 },
+  distanceText: { color: '#374B2A', fontSize: 11, fontWeight: '800' },
+  straightText: { color: '#8A9086', fontSize: 9 },
+  destinationPanel: { position: 'absolute', left: 14, right: 14, bottom: 26, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: '#E4DED2', elevation: 9, zIndex: 30 },
+  destinationHeader: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  destinationTitle: { color: '#262A22', fontSize: 16, fontWeight: '800' },
+  destinationAddress: { color: '#6D7468', fontSize: 11, marginTop: 3, lineHeight: 15 },
+  straightDistance: { color: '#7B5A2E', fontSize: 10, fontWeight: '700', marginTop: 4 },
+  closeButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#F2EEE5', alignItems: 'center', justifyContent: 'center' },
+  closeText: { color: '#62685E', fontSize: 20, lineHeight: 22 },
+  routeStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EFF6FF', padding: 10, borderRadius: 12 },
+  routeStatusText: { color: '#1E4F9A', fontSize: 12, fontWeight: '700' },
+  routeStats: { flexDirection: 'row', gap: 8 },
+  routeStat: { flex: 1, backgroundColor: '#F6F8F3', borderRadius: 12, padding: 10, alignItems: 'center' },
+  routeStatLabel: { color: '#72786E', fontSize: 10, fontWeight: '600' },
+  routeStatValue: { color: '#1E3A5F', fontSize: 14, fontWeight: '800', marginTop: 3 },
+  routeError: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF4E5', padding: 10, borderRadius: 12 },
+  goButton: { backgroundColor: '#374B2A', borderRadius: radius.pill, alignItems: 'center', paddingVertical: 13 },
+  goButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  attribution: { position: 'absolute', left: 8, bottom: 4, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, zIndex: 40 },
+  attributionText: { color: '#4C5560', fontSize: 9, textDecorationLine: 'underline' },
+  placeMarker: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: '#374B2A', alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  placeMarkerSelected: { borderColor: '#2563EB', transform: [{ scale: 1.18 }] },
+  placeMarkerText: { color: '#E86A47', fontSize: 12 },
+  userMarker: { alignItems: 'center' },
+  userDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#38A169', borderWidth: 2, borderColor: '#FFFFFF', marginTop: -5 },
 });

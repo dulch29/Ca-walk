@@ -56,7 +56,7 @@ export function MomentStoryPage({
           )}
         </View>
         <StoryText style={[styles.caption, art.thai]} numberOfLines={2}>
-          {getStoryLocation(summary)}
+          {getStoryLocation(summary, photo)}
         </StoryText>
         <View style={styles.tape} />
       </View>
@@ -73,7 +73,7 @@ export function MomentStoryPage({
             style={[art.thai, styles.location, { color }]}
             numberOfLines={2}
           >
-            {getStoryLocation(summary)}
+            {getStoryLocation(summary, photo)}
           </StoryText>
         </View>
       </View>

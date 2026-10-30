@@ -18,22 +18,27 @@ import {
   type RunSession,
 } from '../services/mockData';
 import {
+  calculateAveragePaceSecondsPerKm,
   calculatePace,
   calculateSpeedKmh,
   distanceKmToSteps,
   haversineDistanceMeters,
-  isSpeedFraud,
   isWithinGeofence,
+  MAX_LOCATION_AGE_MS,
   MERCHANT_GEOFENCE_METERS,
   stepsToDistanceKm,
 } from '../services/locationUtils';
 import {
+  getCurrentTrackedLocation,
   requestLocationPermissions,
   startLocationWatch,
   startMotionTracking,
   type MotionTrackerHandle,
   type TrackedLocation,
 } from '../services/motionTracker';
+import { reverseGeocodeLocation } from '../services/osmLocationService';
+import { OSM_CONFIG } from '../services/osmMapService';
+import type { Sport } from '../types/activity';
 import {
   getCurrentFirebaseUser,
 } from '../services/firebase';
@@ -51,8 +56,10 @@ export interface ActivityDestination {
 
 export interface ActiveRunSession {
   sessionId: string;
+  sport: Sport;
   startTime: string;
   steps: number;
+  acceptedGpsDistanceMeters: number;
   distanceKm: number;
   gpsDistanceKm: number;
   lastAcceptedLocation?: TrackedLocation;
@@ -61,7 +68,9 @@ export interface ActiveRunSession {
   status: 'recording' | 'paused';
   destination?: ActivityDestination;
   photos: string[];
+  photoLocations: Record<string, string>;
   trackCoordinates: Array<[number, number]>;
+  trackSegments: Array<Array<[number, number]>>;
 }
 
 export interface DistanceOperationSuccess<T> {
@@ -86,17 +95,25 @@ export interface AppContextValue {
   coupons: Coupon[];
   mode: AppMode;
   currentLocation: Coordinates | null;
+  locationFix: TrackedLocation | null;
   currentSpeedKmh: number;
   speedFraudActive: boolean;
   trackingError: string | null;
   selectedDestination: ActivityDestination | null;
   setSelectedDestination: (destination: ActivityDestination | null) => void;
   requestLocationPermission: () => Promise<boolean>;
-  startRunSession: (destination?: ActivityDestination) => Promise<void>;
+  requestCurrentLocation: () => Promise<TrackedLocation>;
+  startRunSession: (
+    destination?: ActivityDestination,
+    sport?: Sport,
+  ) => Promise<void>;
   pauseRunSession: () => void;
   resumeRunSession: () => void;
-  endRunSession: () => RunSession | null;
-  addSessionPhoto: (photoUri: string) => void;
+  endRunSession: (reason?: 'manual' | 'arrived') => RunSession | null;
+  addSessionPhoto: (
+    photoUri: string,
+    expectedSessionId?: string,
+  ) => Promise<void>;
   exchangeDistanceForCoupon: (
     merchantId: string,
   ) => DistanceOperationResult<Coupon>;
@@ -125,6 +142,42 @@ function roundDistance(distanceKm: number): number {
   return Math.round(distanceKm * 1000) / 1000;
 }
 
+const MAX_LOCATION_ACCURACY_METERS = 25;
+const MAX_LEGIT_SPEED_KMH = 30;
+const GPS_GAP_MS = 15_000;
+
+function monotonicNowMs(): number {
+  const performanceApi = (
+    globalThis as unknown as { performance?: { now?: () => number } }
+  ).performance;
+  const value = performanceApi?.now?.() ?? NaN;
+  return typeof value === 'number' && Number.isFinite(value) ? value : Date.now();
+}
+
+function createSessionId(counter: number): string {
+  return `run_${Date.now().toString(36)}_${counter.toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+}
+
+function isFreshLocationFix(location: TrackedLocation, now = Date.now()): boolean {
+  return (
+    Number.isFinite(location.latitude) &&
+    location.latitude >= -90 &&
+    location.latitude <= 90 &&
+    Number.isFinite(location.longitude) &&
+    location.longitude >= -180 &&
+    location.longitude <= 180 &&
+    location.accuracy !== null &&
+    Number.isFinite(location.accuracy) &&
+    location.accuracy >= 0 &&
+    location.accuracy <= MAX_LOCATION_ACCURACY_METERS &&
+    Number.isFinite(location.timestamp) &&
+    location.timestamp <= now + 1_000 &&
+    now - location.timestamp <= MAX_LOCATION_AGE_MS
+  );
+}
+
 export const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider(
@@ -143,6 +196,7 @@ export function AppProvider(
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(
     null,
   );
+  const [locationFix, setLocationFix] = useState<TrackedLocation | null>(null);
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
   const [speedFraudActive, setSpeedFraudActive] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
@@ -155,17 +209,20 @@ export function AppProvider(
   const merchantsRef = useRef(merchants);
   const couponsRef = useRef(coupons);
   const currentLocationRef = useRef<Coordinates | null>(null);
+  const locationFixRef = useRef<TrackedLocation | null>(null);
   const selectedDestinationRef = useRef<ActivityDestination | null>(null);
   const trackerRef = useRef<MotionTrackerHandle | null>(null);
   const passiveTrackerRef = useRef<MotionTrackerHandle | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationStaleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousLocationRef = useRef<TrackedLocation | null>(null);
-  const committedMockStepsRef = useRef(0);
-  const committedMockDistanceRef = useRef(0);
+  const accumulatedActiveMsRef = useRef(0);
+  const recordingStartedAtMsRef = useRef<number | null>(null);
   const sessionCounterRef = useRef(0);
   const couponCounterRef = useRef(0);
   const fraudRef = useRef(false);
   const sustainedFastCountRef = useRef(0);
+  const photoLocationControllersRef = useRef(new Set<AbortController>());
 
   useEffect(() => {
     selectedDestinationRef.current = selectedDestination;
@@ -193,143 +250,209 @@ export function AppProvider(
     [],
   );
 
+  const getActiveDurationSeconds = useCallback((): number => {
+    const runningSince = recordingStartedAtMsRef.current;
+    const runningMs =
+      runningSince === null ? 0 : Math.max(0, monotonicNowMs() - runningSince);
+    return Math.floor((accumulatedActiveMsRef.current + runningMs) / 1000);
+  }, []);
+
+  const refreshActiveDuration = useCallback(() => {
+    const durationSeconds = getActiveDurationSeconds();
+    updateActiveSession(session => {
+      if (!session || session.status !== 'recording') {
+        return session;
+      }
+      return {
+        ...session,
+        durationSeconds,
+        currentPace: calculatePace(session.distanceKm, durationSeconds),
+      };
+    });
+  }, [getActiveDurationSeconds, updateActiveSession]);
+
+  const startDurationTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearInterval(timerRef.current);
+    }
+    timerRef.current = setInterval(refreshActiveDuration, 1000);
+  }, [refreshActiveDuration]);
+
+  const commitActiveElapsed = useCallback((): number => {
+    const runningSince = recordingStartedAtMsRef.current;
+    if (runningSince !== null) {
+      accumulatedActiveMsRef.current += Math.max(
+        0,
+        monotonicNowMs() - runningSince,
+      );
+      recordingStartedAtMsRef.current = null;
+    }
+    return Math.floor(accumulatedActiveMsRef.current / 1000);
+  }, []);
+
   const handleStep = useCallback(() => {
     updateActiveSession((previous) => {
       if (!previous || previous.status !== 'recording') {
         return previous;
       }
       const nextSteps = previous.steps + 1;
-      const stepDistanceKm = stepsToDistanceKm(nextSteps);
-      // Accelerometer step fusion: ensure distance doesn't stall if GPS is weak
-      const fusedDistanceKm = Math.max(
-        previous.distanceKm,
-        roundDistance(stepDistanceKm * 0.95),
-      );
       return {
         ...previous,
         steps: nextSteps,
-        distanceKm: fusedDistanceKm,
-        currentPace: calculatePace(fusedDistanceKm, previous.durationSeconds),
       };
     });
   }, [updateActiveSession]);
 
+  const scheduleLocationExpiry = useCallback((location: TrackedLocation) => {
+    if (locationStaleTimerRef.current !== null) {
+      clearTimeout(locationStaleTimerRef.current);
+    }
+
+    const expireIfCurrent = () => {
+      const current = locationFixRef.current;
+      if (!current || current.timestamp !== location.timestamp) {
+        return;
+      }
+      const remainingMs = MAX_LOCATION_AGE_MS - (Date.now() - current.timestamp);
+      if (remainingMs >= 0) {
+        locationStaleTimerRef.current = setTimeout(expireIfCurrent, remainingMs + 1);
+        return;
+      }
+
+      locationStaleTimerRef.current = null;
+      locationFixRef.current = null;
+      currentLocationRef.current = null;
+      previousLocationRef.current = null;
+      setLocationFix(null);
+      setCurrentLocation(null);
+      setCurrentSpeedKmh(0);
+      setTrackingError('สัญญาณ GPS ขาดหาย กรุณารอตำแหน่งใหม่หรือลองอีกครั้ง');
+    };
+
+    const remainingMs = MAX_LOCATION_AGE_MS - (Date.now() - location.timestamp);
+    locationStaleTimerRef.current = setTimeout(
+      expireIfCurrent,
+      Math.max(1, remainingMs + 1),
+    );
+  }, []);
+
   const handleLocation = useCallback(
     (location: TrackedLocation) => {
+      if (!isFreshLocationFix(location)) {
+        if (
+          location.accuracy === null ||
+          (Number.isFinite(location.accuracy) &&
+            location.accuracy > MAX_LOCATION_ACCURACY_METERS)
+        ) {
+          setTrackingError('สัญญาณ GPS ยังไม่แม่นยำ กรุณารอในที่โล่ง');
+        }
+        return;
+      }
+
+      const published = locationFixRef.current;
+      if (published && location.timestamp <= published.timestamp) {
+        return;
+      }
+
+      const session = activeSessionRef.current;
+      const previous = previousLocationRef.current;
+      let segmentDistanceMeters = 0;
+      let segmentSpeedKmh = location.speedKmh ?? 0;
+      let startsNewSegment = false;
+
+      if (session?.status === 'recording') {
+        if (!previous) {
+          startsNewSegment = true;
+        } else {
+          const elapsedMs = location.timestamp - previous.timestamp;
+          if (elapsedMs > GPS_GAP_MS) {
+            startsNewSegment = true;
+          } else {
+            const elapsedSeconds = elapsedMs / 1000;
+            segmentDistanceMeters = haversineDistanceMeters(previous, location);
+            const calculatedSpeedKmh = calculateSpeedKmh(
+              segmentDistanceMeters / 1000,
+              elapsedSeconds,
+            );
+            segmentSpeedKmh = calculatedSpeedKmh;
+
+            if (
+              !Number.isFinite(calculatedSpeedKmh) ||
+              calculatedSpeedKmh > MAX_LEGIT_SPEED_KMH
+            ) {
+              sustainedFastCountRef.current += 1;
+              setSpeedFraudActive(sustainedFastCountRef.current >= 3);
+              return;
+            }
+
+            sustainedFastCountRef.current = 0;
+            setSpeedFraudActive(false);
+            const deadbandMeters = Math.max(
+              2.5,
+              Math.min(
+                8,
+                ((previous.accuracy ?? MAX_LOCATION_ACCURACY_METERS) +
+                  (location.accuracy ?? MAX_LOCATION_ACCURACY_METERS)) *
+                  0.25,
+              ),
+            );
+            if (segmentDistanceMeters < deadbandMeters) {
+              segmentDistanceMeters = 0;
+            }
+          }
+        }
+
+        if (startsNewSegment || segmentDistanceMeters > 0) {
+          previousLocationRef.current = location;
+          const coord: [number, number] = [location.longitude, location.latitude];
+          updateActiveSession(current => {
+            if (!current || current.status !== 'recording') {
+              return current;
+            }
+            const acceptedGpsDistanceMeters =
+              current.acceptedGpsDistanceMeters + segmentDistanceMeters;
+            const distanceKm = acceptedGpsDistanceMeters / 1000;
+            const trackSegments = current.trackSegments.map(segment => [...segment]);
+            if (startsNewSegment || trackSegments.length === 0) {
+              trackSegments.push([coord]);
+            } else {
+              trackSegments[trackSegments.length - 1].push(coord);
+            }
+            return {
+              ...current,
+              acceptedGpsDistanceMeters,
+              distanceKm,
+              gpsDistanceKm: distanceKm,
+              lastAcceptedLocation: location,
+              trackCoordinates: [...current.trackCoordinates, coord],
+              trackSegments,
+              currentPace: calculatePace(distanceKm, current.durationSeconds),
+            };
+          });
+        } else {
+          previousLocationRef.current = location;
+          updateActiveSession(current =>
+            current?.status === 'recording'
+              ? { ...current, lastAcceptedLocation: location }
+              : current,
+          );
+        }
+      } else {
+        previousLocationRef.current = null;
+      }
+
+      locationFixRef.current = location;
+      setLocationFix(location);
       currentLocationRef.current = location;
       setCurrentLocation({
         latitude: location.latitude,
         longitude: location.longitude,
       });
-
-      const session = activeSessionRef.current;
-      if (!session || session.status !== 'recording') {
-        return;
-      }
-
-      // Filter out fixes with poor accuracy (> 25m) to prevent GPS jumps through houses
-      if (location.accuracy !== null && location.accuracy > 25) {
-        return;
-      }
-
-      const previous = previousLocationRef.current;
-      let segmentDistanceKm = 0;
-      let segmentSpeedKmh = location.speedKmh ?? 0;
-
-      if (previous && location.timestamp > previous.timestamp) {
-        const elapsedSeconds = Math.max(
-          0.1,
-          (location.timestamp - previous.timestamp) / 1000,
-        );
-        const segmentDistanceMeters = haversineDistanceMeters(previous, location);
-
-        // Anti-glitch: a human walker/runner cannot jump > 6.0 m/s (~21.6 km/h) in small intervals (< 5s)
-        // If distance jumped > 6.0 m/s * elapsedSeconds, it's a GPS multipath glitch jumping across a building
-        const maxRealisticJumpMeters = Math.max(12, elapsedSeconds * 6.0);
-        if (segmentDistanceMeters > maxRealisticJumpMeters && elapsedSeconds < 5) {
-          // Drop this single outlier glitch, do NOT advance previous to this jump
-          return;
-        }
-
-        // Deadband filter: ignore micro-movements < 2.5 meters to prevent stationary jitter/drift
-        if (segmentDistanceMeters < 2.5) {
-          if (!isSpeedFraud(location.speedKmh ?? 0)) {
-            updateActiveSession(current =>
-              current ? { ...current, lastAcceptedLocation: location } : current,
-            );
-          }
-          return;
-        }
-
-        segmentDistanceKm = segmentDistanceMeters / 1000;
-        const calculatedSpeed = calculateSpeedKmh(
-          segmentDistanceKm,
-          elapsedSeconds,
-        );
-        segmentSpeedKmh =
-          location.speedKmh !== null && location.speedKmh > 0
-            ? location.speedKmh
-            : calculatedSpeed;
-      }
-
-      // Accept this valid location update
-      previousLocationRef.current = location;
       setCurrentSpeedKmh(Number.isFinite(segmentSpeedKmh) ? segmentSpeedKmh : 0);
-
-      // Check speed fraud (faster than Pace 2 / 30 km/h):
-      // Require sustained vehicle speed (at least 3 consecutive updates) to prevent false alerts while walking
-      const isTooFast = isSpeedFraud(segmentSpeedKmh);
-      if (isTooFast) {
-        sustainedFastCountRef.current += 1;
-      } else {
-        sustainedFastCountRef.current = 0;
-      }
-
-      const isSustainedVehicleSpeed = sustainedFastCountRef.current >= 3;
-      setSpeedFraudActive(isSustainedVehicleSpeed);
-      if (isSustainedVehicleSpeed) {
-        // Discard distance accumulation while traveling in a vehicle
-        return;
-      }
-
-      updateActiveSession((current) => {
-        if (!current || current.status !== 'recording') {
-          return current;
-        }
-        const coord: [number, number] = [location.longitude, location.latitude];
-        if (current.trackCoordinates.length === 0) {
-          return {
-            ...current,
-            trackCoordinates: [coord],
-            lastAcceptedLocation: location,
-          };
-        }
-        if (segmentDistanceKm <= 0) {
-          return { ...current, lastAcceptedLocation: location };
-        }
-
-        const nextGpsDist = roundDistance(current.distanceKm + segmentDistanceKm);
-        const stepDist = stepsToDistanceKm(current.steps);
-        // Fuse GPS distance with step distance baseline
-        const distanceKm = Math.max(nextGpsDist, roundDistance(stepDist * 0.95));
-
-        const last = current.trackCoordinates[current.trackCoordinates.length - 1];
-        const newTrack =
-          !last || last[0] !== coord[0] || last[1] !== coord[1]
-            ? [...current.trackCoordinates, coord]
-            : current.trackCoordinates;
-
-        return {
-          ...current,
-          distanceKm,
-          gpsDistanceKm: current.gpsDistanceKm + segmentDistanceKm,
-          lastAcceptedLocation: location,
-          trackCoordinates: newTrack,
-          currentPace: calculatePace(distanceKm, current.durationSeconds),
-        };
-      });
+      setTrackingError(null);
+      scheduleLocationExpiry(location);
     },
-    [updateActiveSession],
+    [scheduleLocationExpiry, updateActiveSession],
   );
 
   const handleTrackingError = useCallback((error: Error) => {
@@ -349,19 +472,18 @@ export function AppProvider(
     }
   }, []);
 
+  const cancelPendingPhotoLocations = useCallback(() => {
+    photoLocationControllersRef.current.forEach(controller => controller.abort());
+    photoLocationControllersRef.current.clear();
+  }, []);
+
   const requestLocationPermission = useCallback(async (): Promise<boolean> => {
     try {
       const granted = await requestLocationPermissions();
       if (granted && !passiveTrackerRef.current && !trackerRef.current) {
         try {
           const handle = await startLocationWatch(
-            (loc) => {
-              currentLocationRef.current = loc;
-              setCurrentLocation({
-                latitude: loc.latitude,
-                longitude: loc.longitude,
-              });
-            },
+            handleLocation,
             (err) => {
               setTrackingError(err.message);
             },
@@ -375,10 +497,31 @@ export function AppProvider(
     } catch {
       return false;
     }
-  }, []);
+  }, [handleLocation]);
+
+  const requestCurrentLocation = useCallback(async (): Promise<TrackedLocation> => {
+    const existing = locationFixRef.current;
+    if (existing && isFreshLocationFix(existing)) {
+      return existing;
+    }
+
+    const location = await getCurrentTrackedLocation();
+    if (!isFreshLocationFix(location)) {
+      throw new Error('ยังไม่ได้ตำแหน่ง GPS ที่แม่นยำ กรุณาลองใหม่ในที่โล่ง');
+    }
+    const previousFix = locationFixRef.current;
+    if (previousFix && location.timestamp <= previousFix.timestamp) {
+      throw new Error('ตำแหน่ง GPS ยังไม่อัปเดต กรุณาลองใหม่');
+    }
+    handleLocation(location);
+    if (locationFixRef.current?.timestamp !== location.timestamp) {
+      throw new Error('ตำแหน่ง GPS ไม่ผ่านการตรวจสอบ กรุณาลองใหม่ในที่โล่ง');
+    }
+    return location;
+  }, [handleLocation]);
 
   const startRunSession = useCallback(
-    async (destination?: ActivityDestination) => {
+    async (destination?: ActivityDestination, sport: Sport = 'walk') => {
       if (activeSessionRef.current) {
         return;
       }
@@ -393,9 +536,11 @@ export function AppProvider(
       sessionCounterRef.current += 1;
       const startTime = new Date().toISOString();
       const nextSession: ActiveRunSession = {
-        sessionId: `run_live_${String(sessionCounterRef.current).padStart(4, '0')}`,
+        sessionId: createSessionId(sessionCounterRef.current),
+        sport,
         startTime,
         steps: 0,
+        acceptedGpsDistanceMeters: 0,
         distanceKm: 0,
         gpsDistanceKm: 0,
         currentPace: '-- /km',
@@ -403,10 +548,12 @@ export function AppProvider(
         status: 'recording',
         destination: chosenDestination,
         photos: [],
+        photoLocations: {},
         trackCoordinates: [],
+        trackSegments: [],
       };
-      committedMockStepsRef.current = 0;
-      committedMockDistanceRef.current = 0;
+      accumulatedActiveMsRef.current = 0;
+      recordingStartedAtMsRef.current = monotonicNowMs();
       previousLocationRef.current = null;
       fraudRef.current = false;
       sustainedFastCountRef.current = 0;
@@ -433,6 +580,8 @@ export function AppProvider(
         }
         activeSessionRef.current = null;
         setActiveSession(null);
+        accumulatedActiveMsRef.current = 0;
+        recordingStartedAtMsRef.current = null;
         stopTracking();
         const message =
           error instanceof Error ? error.message : 'เริ่มการเดินไม่สำเร็จ';
@@ -440,29 +589,14 @@ export function AppProvider(
         throw error instanceof Error ? error : new Error(message);
       }
 
-      if (timerRef.current !== null) {
-        clearInterval(timerRef.current);
-      }
-      timerRef.current = setInterval(() => {
-        updateActiveSession((session) => {
-          if (!session || session.status !== 'recording') {
-            return session;
-          }
-          const durationSeconds = session.durationSeconds + 1;
-          return {
-            ...session,
-            durationSeconds,
-            currentPace: calculatePace(session.distanceKm, durationSeconds),
-          };
-        });
-      }, 1000);
+      startDurationTimer();
     },
     [
       handleLocation,
       handleStep,
       handleTrackingError,
+      startDurationTimer,
       stopTracking,
-      updateActiveSession,
     ],
   );
 
@@ -475,14 +609,20 @@ export function AppProvider(
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    const durationSeconds = commitActiveElapsed();
     previousLocationRef.current = null;
     updateActiveSession((session) => {
       if (!session) {
         return null;
       }
-      return { ...session, status: 'paused' };
+      return {
+        ...session,
+        status: 'paused',
+        durationSeconds,
+        currentPace: calculatePace(session.distanceKm, durationSeconds),
+      };
     });
-  }, [updateActiveSession]);
+  }, [commitActiveElapsed, updateActiveSession]);
 
   const resumeRunSession = useCallback(() => {
     const current = activeSessionRef.current;
@@ -490,6 +630,7 @@ export function AppProvider(
       return;
     }
     previousLocationRef.current = null;
+    recordingStartedAtMsRef.current = monotonicNowMs();
     updateActiveSession((session) => {
       if (!session) {
         return null;
@@ -497,51 +638,93 @@ export function AppProvider(
       return { ...session, status: 'recording' };
     });
 
-    if (timerRef.current !== null) {
-      clearInterval(timerRef.current);
-    }
-    timerRef.current = setInterval(() => {
-      updateActiveSession((session) => {
-        if (!session || session.status !== 'recording') {
-          return session;
-        }
-        const durationSeconds = session.durationSeconds + 1;
-        return {
-          ...session,
-          durationSeconds,
-          currentPace: calculatePace(session.distanceKm, durationSeconds),
-        };
-      });
-    }, 1000);
-  }, [updateActiveSession]);
+    startDurationTimer();
+  }, [startDurationTimer, updateActiveSession]);
 
   const addSessionPhoto = useCallback(
-    (photoUri: string) => {
-      updateActiveSession((previous) => {
-        if (!previous) {
+    async (photoUri: string, expectedSessionId?: string): Promise<void> => {
+      const session = activeSessionRef.current;
+      if (
+        !session ||
+        (expectedSessionId !== undefined &&
+          session.sessionId !== expectedSessionId)
+      ) {
+        return;
+      }
+
+      const sessionId = session.sessionId;
+      const location = locationFixRef.current;
+      updateActiveSession(previous => {
+        if (!previous || previous.sessionId !== sessionId) {
+          return previous;
+        }
+        return { ...previous, photos: [...previous.photos, photoUri] };
+      });
+
+      if (!location || !isFreshLocationFix(location)) {
+        return;
+      }
+
+      const controller = new AbortController();
+      photoLocationControllersRef.current.add(controller);
+      let removeAbortListener = () => {};
+      const aborted = new Promise<null>(resolve => {
+        const onAbort = () => resolve(null);
+        controller.signal.addEventListener('abort', onAbort, { once: true });
+        removeAbortListener = () =>
+          controller.signal.removeEventListener('abort', onAbort);
+      });
+      const timeout = setTimeout(
+        () => controller.abort(),
+        OSM_CONFIG.requestTimeoutMs,
+      );
+      let locationName: string | null = null;
+      try {
+        locationName = await Promise.race([
+          reverseGeocodeLocation(
+            [location.longitude, location.latitude],
+            controller.signal,
+          ),
+          aborted,
+        ]);
+      } catch {
+        // Photo remains available when the public geocoder is offline or rate-limited.
+      } finally {
+        clearTimeout(timeout);
+        removeAbortListener();
+        photoLocationControllersRef.current.delete(controller);
+      }
+
+      if (!locationName) {
+        return;
+      }
+      updateActiveSession(previous => {
+        if (!previous || previous.sessionId !== sessionId) {
           return previous;
         }
         return {
           ...previous,
-          photos: [...previous.photos, photoUri],
+          photoLocations: { ...previous.photoLocations, [photoUri]: locationName },
         };
       });
     },
     [updateActiveSession],
   );
 
-  const endRunSession = useCallback((): RunSession | null => {
+  const endRunSession = useCallback((reason: 'manual' | 'arrived' = 'manual'): RunSession | null => {
     const current = activeSessionRef.current;
     if (!current) {
       return null;
     }
 
+    const durationSeconds = commitActiveElapsed();
     stopTracking();
+    cancelPendingPhotoLocations();
     const endTime = new Date().toISOString();
-    const durationSeconds = current.durationSeconds;
     const distanceKm = roundDistance(current.distanceKm);
     const completed: RunSession = {
       sessionId: current.sessionId,
+      sport: current.sport,
       startTime: current.startTime,
       endTime,
       durationSeconds,
@@ -549,30 +732,34 @@ export function AppProvider(
       distanceKm,
       gpsDistanceKm: current.gpsDistanceKm,
       averagePace: calculatePace(distanceKm, durationSeconds),
+      averagePaceSecondsPerKm: calculateAveragePaceSecondsPerKm(
+        distanceKm,
+        durationSeconds,
+      ),
+      distanceSource: distanceKm > 0 ? 'gps' : 'unavailable',
+      completionReason: reason,
       destinationName: current.destination?.name,
       photos: [...current.photos],
-      trackCoordinates: current.trackCoordinates.map(([lng, lat]) => [lng, lat]),
+      photoLocations: { ...current.photoLocations },
+      trackCoordinates: current.trackCoordinates.map(
+        ([lng, lat]): [number, number] => [lng, lat],
+      ),
+      trackSegments: current.trackSegments.map(segment =>
+        segment.map(([lng, lat]): [number, number] => [lng, lat]),
+      ),
     };
     const newRunHistory = [...runHistoryRef.current, completed];
     runHistoryRef.current = newRunHistory;
     setRunHistory(newRunHistory);
 
-    const uncommittedSteps = Math.max(
-      0,
-      current.steps - committedMockStepsRef.current,
-    );
-    const uncommittedDistance = Math.max(
-      0,
-      distanceKm - committedMockDistanceRef.current,
-    );
     updateUser((previous) => ({
       ...previous,
-      totalSteps: previous.totalSteps + uncommittedSteps,
+      totalSteps: previous.totalSteps + current.steps,
       totalDistanceKm: roundDistance(
-        previous.totalDistanceKm + uncommittedDistance,
+        previous.totalDistanceKm + distanceKm,
       ),
       redeemableDistanceKm: roundDistance(
-        previous.redeemableDistanceKm + uncommittedDistance,
+        previous.redeemableDistanceKm + distanceKm,
       ),
       runHistory: newRunHistory,
     }));
@@ -595,12 +782,12 @@ export function AppProvider(
     activeSessionRef.current = null;
     setActiveSession(null);
     previousLocationRef.current = null;
-    committedMockStepsRef.current = 0;
-    committedMockDistanceRef.current = 0;
+    accumulatedActiveMsRef.current = 0;
+    recordingStartedAtMsRef.current = null;
     setCurrentSpeedKmh(0);
     setSelectedDestination(null);
     return completed;
-  }, [stopTracking, updateUser]);
+  }, [cancelPendingPhotoLocations, commitActiveElapsed, stopTracking, updateUser]);
 
   const exchangeDistanceForCoupon = useCallback(
     (merchantId: string): DistanceOperationResult<Coupon> => {
@@ -719,22 +906,8 @@ export function AppProvider(
       if (steps <= 0 || actualDistanceKm <= 0) {
         return false;
       }
-      committedMockStepsRef.current += steps;
-      committedMockDistanceRef.current = roundDistance(
-        committedMockDistanceRef.current + actualDistanceKm,
-      );
-      updateActiveSession((previous) => {
-        if (!previous) {
-          return previous;
-        }
-        const distanceKm = roundDistance(previous.distanceKm + actualDistanceKm);
-        return {
-          ...previous,
-          steps: previous.steps + steps,
-          distanceKm,
-          currentPace: calculatePace(distanceKm, previous.durationSeconds),
-        };
-      });
+      // Prototype-only balance helper. Never blend simulated progress into a
+      // live activity: RunSession distance is accepted GPS distance only.
       updateUser((previous) => ({
         ...previous,
         totalSteps: previous.totalSteps + steps,
@@ -747,7 +920,7 @@ export function AppProvider(
       }));
       return true;
     },
-    [updateActiveSession, updateUser],
+    [updateUser],
   );
 
   const toggleSpeedFraud = useCallback((): boolean => {
@@ -796,9 +969,14 @@ export function AppProvider(
   useEffect(
     () => () => {
       stopTracking();
+      cancelPendingPhotoLocations();
+      if (locationStaleTimerRef.current !== null) {
+        clearTimeout(locationStaleTimerRef.current);
+        locationStaleTimerRef.current = null;
+      }
       activeSessionRef.current = null;
     },
-    [stopTracking],
+    [cancelPendingPhotoLocations, stopTracking],
   );
 
   const value = useMemo<AppContextValue>(
@@ -810,12 +988,14 @@ export function AppProvider(
       coupons,
       mode,
       currentLocation,
+      locationFix,
       currentSpeedKmh,
       speedFraudActive,
       trackingError,
       selectedDestination,
       setSelectedDestination,
       requestLocationPermission,
+      requestCurrentLocation,
       startRunSession,
       pauseRunSession,
       resumeRunSession,
@@ -836,12 +1016,14 @@ export function AppProvider(
       coupons,
       mode,
       currentLocation,
+      locationFix,
       currentSpeedKmh,
       speedFraudActive,
       trackingError,
       selectedDestination,
       setSelectedDestination,
       requestLocationPermission,
+      requestCurrentLocation,
       startRunSession,
       pauseRunSession,
       resumeRunSession,

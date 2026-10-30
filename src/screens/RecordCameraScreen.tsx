@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  BackHandler,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   Camera,
   useCameraPermission,
@@ -9,21 +16,34 @@ import { colors, font, radius, space } from '../theme';
 
 type Props = {
   onBack: () => void;
-  onCaptured: (uri: string) => void;
+  onCaptured: (uri: string) => void | Promise<void>;
 };
 
 export default function RecordCameraScreen({ onBack, onCaptured }: Props) {
-  const { hasPermission, requestPermission } = useCameraPermission();
+  const { hasPermission, canRequestPermission, requestPermission } =
+    useCameraPermission();
   const photoOutput = usePhotoOutput();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => busy,
+    );
+    return () => subscription.remove();
+  }, [busy]);
+
   const shoot = async () => {
     setBusy(true);
+    setError(null);
     try {
-      const photo = await photoOutput.capturePhoto({}, {});
-      const path = await photo.saveToTemporaryFileAsync();
-      onCaptured(path.startsWith('file://') ? path : `file://${path}`);
+      const photo = await photoOutput.capturePhotoToFile(
+        { enableShutterSound: false },
+        {},
+      );
+      const path = photo.filePath;
+      await onCaptured(path.startsWith('file://') ? path : `file://${path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ถ่ายรูปไม่สำเร็จ');
     } finally {
@@ -36,11 +56,19 @@ export default function RecordCameraScreen({ onBack, onCaptured }: Props) {
       <View style={[styles.root, styles.center]}>
         <Text style={font.h2}>ขออนุญาตใช้กล้องเพื่อถ่ายรูปภารกิจ</Text>
         <Pressable
-          onPress={requestPermission}
+          onPress={async () => {
+            if (canRequestPermission) {
+              await requestPermission();
+            } else {
+              await Linking.openSettings();
+            }
+          }}
           accessibilityRole="button"
           style={styles.btn}
         >
-          <Text style={styles.btnText}>อนุญาต</Text>
+          <Text style={styles.btnText}>
+            {canRequestPermission ? 'อนุญาต' : 'เปิดการตั้งค่า'}
+          </Text>
         </Pressable>
         <Pressable onPress={onBack} accessibilityRole="button" hitSlop={8}>
           <Text style={font.body}>ย้อนกลับ</Text>
@@ -55,15 +83,18 @@ export default function RecordCameraScreen({ onBack, onCaptured }: Props) {
         style={StyleSheet.absoluteFill}
         device="back"
         isActive
+        enableNativeZoomGesture
         outputs={[photoOutput]}
         onError={e => setError(e.message)}
       />
       <Pressable
         onPress={onBack}
+        disabled={busy}
         accessibilityRole="button"
         accessibilityLabel="ย้อนกลับ"
+        accessibilityState={{ disabled: busy }}
         hitSlop={8}
-        style={styles.back}
+        style={[styles.back, busy && styles.backBusy]}
       >
         <Text style={font.h2}>‹</Text>
       </Pressable>
@@ -100,6 +131,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  backBusy: { opacity: 0.5 },
   error: {
     position: 'absolute',
     top: 72,

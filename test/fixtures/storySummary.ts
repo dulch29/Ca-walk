@@ -12,5 +12,6 @@ export const storyFixture: RunSummary = {
   distanceSource: 'gps',
   completionReason: 'manual',
   photos: [],
+  photoLocations: {},
   trackCoordinates: [],
 };

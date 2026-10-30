@@ -7,6 +7,7 @@ import type { ActiveRunSession } from '../src/context/AppContext';
 
 const completed: RunSession = {
   sessionId: 'completed-1',
+  sport: 'walk',
   startTime: '2026-10-29T00:00:00Z',
   endTime: '2026-10-29T00:35:00Z',
   durationSeconds: 1800,
@@ -15,7 +16,9 @@ const completed: RunSession = {
   gpsDistanceKm: 5,
   averagePace: '5.00 /km',
   photos: ['file:///current.jpg'],
+  photoLocations: { 'file:///current.jpg': 'สวนสิริกิติ์' },
   trackCoordinates: [[100.5, 13.7]],
+  trackSegments: [[[100.5, 13.7]]],
   destinationName: 'ร้านปลายทาง',
 };
 it('uses accepted GPS distance and paused active time from the completed snapshot', () => {
@@ -46,7 +49,15 @@ it('clones photos and coordinate tuples instead of keeping mutable session array
   const summary = createRunSummary(completed, 'walk', 'arrived');
   expect(summary.photos).toEqual(completed.photos);
   expect(summary.photos).not.toBe(completed.photos);
+  expect(summary.photoLocations).toEqual(completed.photoLocations);
+  expect(summary.photoLocations).not.toBe(completed.photoLocations);
   expect(summary.trackCoordinates[0]).not.toBe(completed.trackCoordinates![0]);
+  expect(summary.trackSegments).toEqual(completed.trackSegments);
+  expect(summary.trackSegments).not.toBe(completed.trackSegments);
+  expect(summary.trackSegments?.[0]).not.toBe(completed.trackSegments?.[0]);
+  expect(summary.trackSegments?.[0]?.[0]).not.toBe(
+    completed.trackSegments?.[0]?.[0],
+  );
   expect(summary.completionReason).toBe('arrived');
 });
 it.each([0, 0.005, NaN, Infinity])(
@@ -61,11 +72,15 @@ it.each([0, 0.005, NaN, Infinity])(
 const now = Date.parse('2026-10-29T00:35:00Z');
 const active: ActiveRunSession = {
   ...completed,
+  sport: 'walk',
   gpsDistanceKm: 5,
+  acceptedGpsDistanceMeters: 5000,
   status: 'recording',
   currentPace: '6.00 /km',
   photos: [],
+  photoLocations: {},
   trackCoordinates: [],
+  trackSegments: [],
   destination: { id: 'dest', name: 'ร้าน', coordinates: [100.5, 13.7] },
   lastAcceptedLocation: {
     longitude: 100.5,
@@ -86,6 +101,7 @@ it('offers arrival completion only for a fresh accurate accepted fix near the de
   for (const fix of [
     { ...active.lastAcceptedLocation!, accuracy: 80 },
     { ...active.lastAcceptedLocation!, accuracy: null },
+    { ...active.lastAcceptedLocation!, timestamp: now - 10001 },
     { ...active.lastAcceptedLocation!, timestamp: now - 30000 },
     { ...active.lastAcceptedLocation!, timestamp: now + 30000 },
     { ...active.lastAcceptedLocation!, longitude: 100.6 },

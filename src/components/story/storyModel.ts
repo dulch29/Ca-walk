@@ -60,11 +60,12 @@ export function getStoryEndTime(summary: RunSummary): string {
       });
 }
 
-export function getStoryLocation(summary: RunSummary): string {
-  if (!summary.destinationName) {
-    return 'Your own route';
+export function getStoryLocation(
+  summary: RunSummary,
+  photo: string | null,
+): string {
+  if (!photo) {
+    return 'เส้นทางของคุณ';
   }
-  return summary.completionReason === 'arrived'
-    ? summary.destinationName
-    : `จุดหมาย: ${summary.destinationName}`;
+  return summary.photoLocations?.[photo]?.trim() || 'ตำแหน่งที่ถ่ายรูป';
 }
