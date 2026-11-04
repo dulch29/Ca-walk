@@ -1,0 +1,425 @@
+<template>
+  <style>
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Regular.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Bold.ttf') format('truetype');
+      font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+    }
+
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Prompt', sans-serif;
+      background: radial-gradient(circle at 40% 30%, #151e30 0%, #0d1424 70%, #060911 100%);
+      color: #f8fafc;
+      padding: 50px 80px;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-size: 60px 60px;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 30px;
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .feature-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 18px;
+      background: rgba(255, 107, 53, 0.15);
+      border: 1px solid rgba(255, 107, 53, 0.4);
+      border-radius: 9999px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #ff8a5c;
+      margin-bottom: 12px;
+      width: fit-content;
+    }
+
+    .section-title {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .text-orange {
+      color: #ff6b35;
+    }
+    .text-amber {
+      color: #f59e0b;
+    }
+
+    /* 4-Step Interactive Journey Flow Bar */
+    .flow-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 10px 16px;
+    }
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #94a3b8;
+      padding: 6px 14px;
+      border-radius: 10px;
+    }
+    .flow-step.active {
+      background: rgba(255, 107, 53, 0.2);
+      border: 1px solid rgba(255, 107, 53, 0.5);
+      color: #ff9d75;
+    }
+    .flow-arrow {
+      color: #475569;
+      font-size: 14px;
+    }
+
+    /* Main Showcase Area: Left Phone (Live Walk) + Right Phone (Cat Camera & Story) */
+    .showcase-stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 50px;
+      height: 820px;
+      position: relative;
+    }
+
+    /* Phone Chassis Container */
+    .phone-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .phone-device {
+      position: relative;
+      width: 370px;
+      height: 770px;
+      background: #0f172a;
+      border-radius: 44px;
+      border: 9px solid #1e293b;
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.1),
+        0 25px 60px -10px rgba(0, 0, 0, 0.7),
+        0 0 30px rgba(255, 107, 53, 0.15);
+      overflow: hidden;
+    }
+
+    .phone-punch {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 16px;
+      background: #000;
+      border-radius: 50%;
+      z-index: 20;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .phone-screen-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .phone-label-badge {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 22px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #f1f5f9;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Floating Feature Info Cards on the sides */
+    .side-cards-col {
+      width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 24px 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .feature-card.highlight {
+      border-left: 4px solid #ff6b35;
+      background: rgba(255, 107, 53, 0.08);
+    }
+    .feature-card.amber-hl {
+      border-left: 4px solid #f59e0b;
+    }
+    .feature-card.green-hl {
+      border-left: 4px solid #10b981;
+    }
+
+    .card-header-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .card-icon {
+      font-size: 26px;
+    }
+    .card-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .card-detail {
+      font-size: 17px;
+      color: #94a3b8;
+      line-height: 1.45;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene3_demo" data-width="1920" data-height="1080">
+    <div class="bg-grid"></div>
+
+    <div id="demo-top-header" class="top-header clip" data-start="0" data-duration="30.7">
+      <div class="header-left">
+        <div id="demo-pill" class="feature-pill">
+          <span>✨</span>
+          <span>4 STEPS ALL-IN-ONE APP</span>
+        </div>
+        <h2 id="demo-main-title" class="section-title">
+          4 ขั้นตอน <span class="text-orange">จบใน APP เดียว</span> เชื่อมทุกก้าวเข้าร้านจริง
+        </h2>
+      </div>
+
+      <div id="demo-flow-bar" class="flow-bar">
+        <div id="step-1" class="flow-step active">1. Find & Match</div>
+        <span class="flow-arrow">➔</span>
+        <div id="step-2" class="flow-step">2. Navigate</div>
+        <span class="flow-arrow">➔</span>
+        <div id="step-3" class="flow-step">3. Snap & Share</div>
+        <span class="flow-arrow">➔</span>
+        <div id="step-4" class="flow-step">4. Redeem</div>
+      </div>
+    </div>
+
+    <div id="demo-showcase-stage" style="display: flex; align-items: center; justify-content: center; gap: 50px; height: 820px; position: relative;">
+      <!-- Left Side Feature Callouts -->
+      <div id="demo-side-col" class="side-cards-col clip" data-start="0" data-duration="30.7">
+        <div id="fcard-1" class="feature-card highlight">
+          <div class="card-header-line">
+            <span class="card-icon">🧭</span>
+            <span class="card-title">Live OSM Map & Cat Guide</span>
+          </div>
+          <p class="card-detail">
+            ค้นหาเควสต์รอบตัว แมวเดินเคียงข้างบนแผนที่ แสดงสถานะ GPS, ก้าวเดิน และความเร็วเรียลไทม์
+          </p>
+        </div>
+
+        <div id="fcard-2" class="feature-card amber-hl">
+          <div class="card-header-line">
+            <span class="card-icon">📸</span>
+            <span class="card-title">Cat AR / Story Generator</span>
+          </div>
+          <p class="card-detail">
+            ถ่ายรูปคู่แมวการ์ตูนดุ๊กดิ๊ก พร้อมแสตมป์สถิติการเดิน แชร์ลง Social ได้ทันที สร้าง Organic Word-of-Mouth
+          </p>
+        </div>
+
+        <div id="fcard-3" class="feature-card green-hl">
+          <div class="card-header-line">
+            <span class="card-icon">🏷️</span>
+            <span class="card-title">Sweat-for-Perks Coupons</span>
+          </div>
+          <p class="card-detail">
+            สะสมก้าวแลกส่วนลดพิเศษจากร้านพาร์ทเนอร์ (Amazon, 7-Eleven, KFC, Inthanin)
+          </p>
+        </div>
+      </div>
+
+      <!-- Phone 1: Walk Tracker Demo -->
+      <div id="phone-walk-wrap" class="phone-container">
+        <div class="phone-device">
+          <div class="phone-punch"></div>
+          <video
+            id="demo-walk-video"
+            class="clip phone-screen-video"
+            src="assets/media/test_walk.mp4"
+            data-start="0"
+            data-duration="30.7"
+            muted
+            playsinline
+            data-playback-rate="1.25"
+          ></video>
+        </div>
+        <div id="phone-walk-label" class="phone-label-badge clip" data-start="0" data-duration="30.7">
+          <span>🐾</span>
+          <span>Live Walk Tracking</span>
+        </div>
+      </div>
+
+      <!-- Phone 2: Cat Story & Camera Demo -->
+      <div id="phone-story-wrap" class="phone-container">
+        <div class="phone-device">
+          <div class="phone-punch"></div>
+          <video
+            id="demo-story-video"
+            class="clip phone-screen-video"
+            src="assets/media/test_story.mp4"
+            data-start="0"
+            data-duration="30.7"
+            muted
+            playsinline
+            data-playback-rate="1.1"
+          ></video>
+        </div>
+        <div id="phone-story-label" class="phone-label-badge clip" data-start="0" data-duration="30.7">
+          <span>📸</span>
+          <span>Cat Story & Camera</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // Header & Flow Bar (0.0 to 1.5s in scene)
+    tl.fromTo(
+      "#demo-pill",
+      { opacity: 0, y: -15 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      0.3
+    );
+
+    tl.fromTo(
+      "#demo-main-title",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" },
+      0.5
+    );
+
+    tl.fromTo(
+      "#demo-flow-bar",
+      { opacity: 0, scale: 0.9 },
+      { opacity: 1, scale: 1, duration: 0.5, ease: "power2.out" },
+      0.8
+    );
+
+    // Left Side Feature Cards Entrance
+    tl.fromTo(
+      "#fcard-1",
+      { opacity: 0, x: -40 },
+      { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" },
+      1.0
+    );
+    tl.fromTo(
+      "#fcard-2",
+      { opacity: 0, x: -40 },
+      { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" },
+      1.4
+    );
+    tl.fromTo(
+      "#fcard-3",
+      { opacity: 0, x: -40 },
+      { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" },
+      1.8
+    );
+
+    // Phone 1 (Walk Tracking) Entrance
+    tl.fromTo(
+      "#phone-walk-wrap",
+      { opacity: 0, y: 80, scale: 0.9 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "expo.out" },
+      0.9
+    );
+
+    // Update active flow steps as voiceover progresses
+    // At ~6s into scene -> step 2 Navigate active
+    tl.call(() => {
+      document.getElementById("step-1")?.classList.remove("active");
+      document.getElementById("step-2")?.classList.add("active");
+    }, null, 6.0);
+
+    // Phone 2 (Cat Story) Entrance at ~14s (syncs with voiceover talking about camera/story capture)
+    tl.fromTo(
+      "#phone-story-wrap",
+      { opacity: 0, x: 80, scale: 0.85 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.8, ease: "expo.out" },
+      12.0
+    );
+
+    // At ~14s into scene -> step 3 Snap & Share active
+    tl.call(() => {
+      document.getElementById("step-2")?.classList.remove("active");
+      document.getElementById("step-3")?.classList.add("active");
+    }, null, 14.0);
+
+    // At ~22s into scene -> step 4 Redeem active
+    tl.call(() => {
+      document.getElementById("step-3")?.classList.remove("active");
+      document.getElementById("step-4")?.classList.add("active");
+    }, null, 22.0);
+
+    // Exit transition
+    tl.to(
+      "#root",
+      { opacity: 0, scale: 0.97, filter: "blur(6px)", duration: 0.45, ease: "power3.in" },
+      30.2
+    );
+
+    window.__timelines["scene3_demo"] = tl;
+  </script>
+</template>

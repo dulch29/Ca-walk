@@ -1,0 +1,654 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 7
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 158.21,
+    "samples": [
+      8.789,
+      26.368,
+      43.947,
+      61.526,
+      79.105,
+      96.684,
+      114.263,
+      131.842,
+      149.421
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      8.789,
+      43.947,
+      79.105,
+      114.263,
+      149.421
+    ],
+    "checked": 45,
+    "passed": 45
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 7,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "dead_stretch",
+        "severity": "warning",
+        "message": "Nothing on screen changes for 4.75 s (2.11–6.87 s): start the next move within 3 s, or put data-hold on the element whose stillness is deliberate; see references/motion.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 2.113,
+        "seconds": 4.754,
+        "floorSeconds": 3,
+        "until": 6.867
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 9 text elements stay under it for 0.5 s or more, the smallest \"นับก้าว & แมวนำทางเรียลไทม์\" at 14 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "นับก้าว & แมวนำทางเรียลไทม์",
+        "selector": "div.badge-text-sub",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene1_hook.html",
+        "bbox": {
+          "x": 1348.43,
+          "y": 890.66,
+          "width": 177.85,
+          "height": 21.3
+        },
+        "time": 9.508,
+        "times": [
+          0,
+          7.924,
+          8.98,
+          9.244,
+          9.244,
+          9.244,
+          9.508,
+          9.508,
+          9.508
+        ],
+        "fontPx": 14.2,
+        "floorPx": 28,
+        "seconds": 8.716,
+        "elements": [
+          {
+            "selector": "div.badge-text-sub",
+            "text": "นับก้าว & แมวนำทางเรียลไทม์",
+            "fontPx": 14.2,
+            "time": 9.508,
+            "seconds": 8.716
+          },
+          {
+            "selector": "div.badge-text-title",
+            "text": "เควสต์คลองโอ่งอ่าง",
+            "fontPx": 17.75,
+            "time": 9.508,
+            "seconds": 8.716
+          },
+          {
+            "selector": "#hero-pills-list > div:nth-of-type(2) > span:nth-of-type(1)",
+            "text": "🗺️",
+            "fontPx": 21.67,
+            "time": 9.244,
+            "seconds": 8.98
+          },
+          {
+            "selector": "#hero-pills-list > div:nth-of-type(2) > span:nth-of-type(2)",
+            "text": "City Exploration Quest",
+            "fontPx": 21.67,
+            "time": 9.244,
+            "seconds": 8.98
+          },
+          {
+            "selector": "#hero-tag",
+            "text": "Cat Walk-to-Discover & Sweat-for-Perks",
+            "fontPx": 21.96,
+            "time": 7.924,
+            "seconds": 10.3
+          },
+          {
+            "selector": "div.pill-item.active > span:nth-of-type(2)",
+            "text": "Virtual Cat Guide",
+            "fontPx": 21.96,
+            "time": 9.244,
+            "seconds": 8.98
+          },
+          {
+            "selector": "#hero-pills-list > div:nth-of-type(3) > span:nth-of-type(2)",
+            "text": "B2B Drive-to-Store",
+            "fontPx": 21.96,
+            "time": 9.508,
+            "seconds": 8.716
+          },
+          {
+            "selector": "#hook-pill > span:nth-of-type(2)",
+            "text": "HACKATHON IDEA",
+            "fontPx": 22.8,
+            "time": 0,
+            "seconds": 7.395
+          },
+          {
+            "selector": "#hero-desc-text",
+            "text": "แพลตฟอร์มที่ผสาน Gamification แมวเพื่อนแท้ เข้ากับระบบนำทางเควสต์ร้านค้า เปลี่ยนเหงื่อและระยะทาง ให้กลายเป็นทราฟฟิกและยอดขายจริง",
+            "fontPx": 25.96,
+            "time": 8.98,
+            "seconds": 9.244
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 11 text elements stay under it for 0.5 s or more, the smallest \"ร้านอาหาร คาเฟ่ ธุรกิจในย่าน\" at 22 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "ร้านอาหาร คาเฟ่ ธุรกิจในย่าน",
+        "selector": "#merchant-pain-card > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene2_problem.html",
+        "bbox": {
+          "x": 1161.48,
+          "y": 430.99,
+          "width": 255.95,
+          "height": 32.29
+        },
+        "time": 29.318,
+        "times": [
+          19.281,
+          19.545,
+          20.338,
+          20.338,
+          24.035,
+          24.035,
+          29.318,
+          30.374,
+          30.374,
+          34.864,
+          34.864
+        ],
+        "fontPx": 21.53,
+        "floorPx": 28,
+        "seconds": 16.639,
+        "elements": [
+          {
+            "selector": "#merchant-pain-card > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "ร้านอาหาร คาเฟ่ ธุรกิจในย่าน",
+            "fontPx": 21.53,
+            "time": 29.318,
+            "seconds": 16.639
+          },
+          {
+            "selector": "#user-pain-card > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "คนเดินเล่น & สายสุขภาพในเมือง",
+            "fontPx": 21.55,
+            "time": 19.545,
+            "seconds": 26.412
+          },
+          {
+            "selector": "#user-pain-1 > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "ขาดแรงจูงใจ เส้นทางน่าเบื่อ เดินวนที่เดิม ไม่มีเป้าหมายที่สนุก",
+            "fontPx": 21.75,
+            "time": 20.338,
+            "seconds": 25.619
+          },
+          {
+            "selector": "#user-pain-2 > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "โฟกัส Pace และระยะทางมาราธอน ไม่เหมาะกับสาย City Exploration และคนทั่วไป",
+            "fontPx": 21.75,
+            "time": 24.035,
+            "seconds": 21.922
+          },
+          {
+            "selector": "#merchant-pain-1 > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "ยิง Ads Facebook/IG คนเห็นเยอะแต่เลื่อนผ่าน ไม่เกิด Walk-in traffic หน้าร้าน",
+            "fontPx": 21.75,
+            "time": 30.374,
+            "seconds": 15.583
+          },
+          {
+            "selector": "#merchant-pain-2 > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "แคปรูปแจกต่อ ไม่รู้ว่ามาหน้าร้านจริงไหม และการลด 50% ทำร้ายกำไรร้านค้าในระยะยาว",
+            "fontPx": 21.75,
+            "time": 34.864,
+            "seconds": 11.093
+          },
+          {
+            "selector": "#problem-sub",
+            "text": "ปัญหาของคนเมืองที่อยากเดินสำรวจ กับร้านค้าชุมชนที่เรียกร้องลูกค้าหน้าร้านจริง",
+            "fontPx": 25.7,
+            "time": 19.281,
+            "seconds": 26.676
+          },
+          {
+            "selector": "#user-pain-1 > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "อยากเดินชิลสำรวจเมือง แต่ไม่รู้จะไปไหน",
+            "fontPx": 25.7,
+            "time": 20.338,
+            "seconds": 25.619
+          },
+          {
+            "selector": "#user-pain-2 > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "แอปวิ่งทั่วไป (Strava, Nike) จริงจังเกินไป",
+            "fontPx": 25.7,
+            "time": 24.035,
+            "seconds": 21.922
+          },
+          {
+            "selector": "#merchant-pain-1 > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "จ่ายโฆษณาแพง ไม่การันตีคนเดินเข้าร้านจริง",
+            "fontPx": 25.7,
+            "time": 30.374,
+            "seconds": 15.583
+          },
+          {
+            "selector": "#merchant-pain-2 > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "แคมเปญแจกคูปองทั่วไป เสี่ยงโดนโกง & กดดันกำไร",
+            "fontPx": 25.7,
+            "time": 34.864,
+            "seconds": 11.093
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 9 text elements stay under it for 0.5 s or more, the smallest \"ค้นหาเควสต์รอบตัว แมวเดินเคียงข้างบนแ...\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "ค้นหาเควสต์รอบตัว แมวเดินเคียงข้างบนแผนที่ แสดงสถานะ GPS, ก้าวเดิน และความเร็วเรียลไทม์",
+        "selector": "#fcard-1 > p:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene3_demo.html",
+        "bbox": {
+          "x": 341.45,
+          "y": 421.84,
+          "width": 377.81,
+          "height": 50.64
+        },
+        "time": 47.014,
+        "times": [
+          47.014,
+          47.014,
+          47.014,
+          47.542,
+          47.542,
+          47.806,
+          47.806,
+          47.806,
+          58.107
+        ],
+        "fontPx": 16.92,
+        "floorPx": 28,
+        "seconds": 29.582,
+        "elements": [
+          {
+            "selector": "#fcard-1 > p:nth-of-type(1)",
+            "text": "ค้นหาเควสต์รอบตัว แมวเดินเคียงข้างบนแผนที่ แสดงสถานะ GPS, ก้าวเดิน และความเร็วเรียลไทม์",
+            "fontPx": 16.92,
+            "time": 47.014,
+            "seconds": 29.582
+          },
+          {
+            "selector": "#fcard-2 > p:nth-of-type(1)",
+            "text": "ถ่ายรูปคู่แมวการ์ตูนดุ๊กดิ๊ก พร้อมแสตมป์สถิติการเดิน แชร์ลง Social ได้ทันที สร้าง Organic Word-of-Mouth",
+            "fontPx": 16.92,
+            "time": 47.542,
+            "seconds": 29.054
+          },
+          {
+            "selector": "#fcard-3 > p:nth-of-type(1)",
+            "text": "สะสมก้าวแลกส่วนลดพิเศษจากร้านพาร์ทเนอร์ (Amazon, 7-Eleven, KFC, Inthanin)",
+            "fontPx": 16.92,
+            "time": 47.806,
+            "seconds": 28.79
+          },
+          {
+            "selector": "#phone-story-label > span:nth-of-type(2)",
+            "text": "Cat Story & Camera",
+            "fontPx": 17.75,
+            "time": 58.107,
+            "seconds": 18.489
+          },
+          {
+            "selector": "#phone-walk-label > span:nth-of-type(2)",
+            "text": "Live Walk Tracking",
+            "fontPx": 17.83,
+            "time": 47.014,
+            "seconds": 29.582
+          },
+          {
+            "selector": "#fcard-1 > div:nth-of-type(1) > span:nth-of-type(2)",
+            "text": "Live OSM Map & Cat Guide",
+            "fontPx": 21.89,
+            "time": 47.014,
+            "seconds": 29.582
+          },
+          {
+            "selector": "#fcard-2 > div:nth-of-type(1) > span:nth-of-type(2)",
+            "text": "Cat AR / Story Generator",
+            "fontPx": 21.89,
+            "time": 47.542,
+            "seconds": 29.054
+          },
+          {
+            "selector": "#fcard-3 > div:nth-of-type(1) > span:nth-of-type(2)",
+            "text": "Sweat-for-Perks Coupons",
+            "fontPx": 21.89,
+            "time": 47.806,
+            "seconds": 28.79
+          },
+          {
+            "selector": "#fcard-3 > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "🏷️",
+            "fontPx": 25.87,
+            "time": 47.806,
+            "seconds": 28.79
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 5 text elements stay under it for 0.5 s or more, the smallest \"⏱️ ภายใน 24 – 72 ชั่วโมง\" at 18 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "⏱️ ภายใน 24 – 72 ชั่วโมง",
+        "selector": "div.pocket-time-tag",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene4_antifraud.html",
+        "bbox": {
+          "x": 203.05,
+          "y": 310.89,
+          "width": 200.57,
+          "height": 27.5
+        },
+        "time": 77.652,
+        "times": [
+          77.652,
+          77.652,
+          78.973,
+          84.784,
+          90.858
+        ],
+        "fontPx": 17.68,
+        "floorPx": 28,
+        "seconds": 29.318,
+        "elements": [
+          {
+            "selector": "div.pocket-time-tag",
+            "text": "⏱️ ภายใน 24 – 72 ชั่วโมง",
+            "fontPx": 17.68,
+            "time": 77.652,
+            "seconds": 29.318
+          },
+          {
+            "selector": "#pocket-quote-box",
+            "text": "“ไม่จำเป็นต้องรีบเข้าร้านทันทีหลังวิ่งเสร็จ กลับไปอาบน้ำก่อนได้ แยกเวลาวิ่งออกจากเวลาใช้เงิน”",
+            "fontPx": 21.61,
+            "time": 77.652,
+            "seconds": 29.318
+          },
+          {
+            "selector": "#shield-1 > div:nth-of-type(2) > p:nth-of-type(1)",
+            "text": "ปุ่มกดใช้คูปองจะปลดล็อกเฉพาะเมื่อผู้ใช้อยู่ในรัศมีพิกัดหน้าร้านจริงเท่านั้น กันการแลกสิทธิ์จากที่บ้าน",
+            "fontPx": 21.9,
+            "time": 78.973,
+            "seconds": 27.997
+          },
+          {
+            "selector": "#shield-2 > div:nth-of-type(2) > p:nth-of-type(1)",
+            "text": "มีเวลานับถอยหลังจำกัด ป้องกันการแคปภาพหน้าจอส่งต่อให้เพื่อน หรือวนใช้ซ้ำ",
+            "fontPx": 21.91,
+            "time": 84.784,
+            "seconds": 22.186
+          },
+          {
+            "selector": "#shield-3 > div:nth-of-type(2) > p:nth-of-type(1)",
+            "text": "เตือนและตัดสิทธิ์ทันทีหากพบความเร็วเกินปกติ กันการขี่มอเตอร์ไซค์ รถยนต์ หรือโกง GPS ปั๊มระยะ",
+            "fontPx": 21.91,
+            "time": 90.858,
+            "seconds": 16.112
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 13 text elements stay under it for 0.5 s or more, the smallest \"ก่อนหักต้นทุนเซิร์ฟเวอร์และการตลาด\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "ก่อนหักต้นทุนเซิร์ฟเวอร์และการตลาด",
+        "selector": "#total-banner-box > div:nth-of-type(1) > div:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene5_business.html",
+        "bbox": {
+          "x": 158.54,
+          "y": 840.63,
+          "width": 261.3,
+          "height": 26.16
+        },
+        "time": 122.289,
+        "times": [
+          108.027,
+          108.291,
+          108.555,
+          108.819,
+          114.894,
+          114.894,
+          118.063,
+          118.063,
+          120.704,
+          120.704,
+          122.289,
+          122.289,
+          126.251
+        ],
+        "fontPx": 16.97,
+        "floorPx": 28,
+        "seconds": 16.64,
+        "elements": [
+          {
+            "selector": "#total-banner-box > div:nth-of-type(1) > div:nth-of-type(2)",
+            "text": "ก่อนหักต้นทุนเซิร์ฟเวอร์และการตลาด",
+            "fontPx": 16.97,
+            "time": 122.289,
+            "seconds": 16.64
+          },
+          {
+            "selector": "#scard-sub > div:nth-of-type(3)",
+            "text": "ต่อร้านค้า / เดือน (เฉลี่ย 1,000 ฿)",
+            "fontPx": 19.97,
+            "time": 108.291,
+            "seconds": 30.638
+          },
+          {
+            "selector": "#scard-redeem > div:nth-of-type(3)",
+            "text": "ต่อการใช้คูปองจริง (เฉลี่ย 8 ฿)",
+            "fontPx": 19.97,
+            "time": 108.555,
+            "seconds": 30.374
+          },
+          {
+            "selector": "div.chart-title",
+            "text": "สัดส่วนรายได้ต่อย่าน (บาท/เดือน)",
+            "fontPx": 19.97,
+            "time": 108.819,
+            "seconds": 30.11
+          },
+          {
+            "selector": "div.exp-title > span:nth-of-type(2)",
+            "text": "Hyper-Local Expansion: เริ่มจากหนาแน่นแล้วขยาย",
+            "fontPx": 19.97,
+            "time": 126.251,
+            "seconds": 12.678
+          },
+          {
+            "selector": "#calc-row-1 > div:nth-of-type(1) > div:nth-of-type(2)",
+            "text": "10 ร้านค้า × 1,000 บาท/เดือน",
+            "fontPx": 21.96,
+            "time": 114.894,
+            "seconds": 24.035
+          },
+          {
+            "selector": "#calc-row-2 > div:nth-of-type(1) > div:nth-of-type(2)",
+            "text": "500 สิทธิ์ × 8 บาท/ครั้ง",
+            "fontPx": 21.96,
+            "time": 118.063,
+            "seconds": 20.866
+          },
+          {
+            "selector": "#calc-row-3 > div:nth-of-type(1) > div:nth-of-type(2)",
+            "text": "สปอนเซอร์เส้นทางเควสต์ & ชุมชนท่องเที่ยว",
+            "fontPx": 21.96,
+            "time": 120.704,
+            "seconds": 18.225
+          },
+          {
+            "selector": "#biz-sub",
+            "text": "โมเดลธุรกิจชัดเจน ขยายตัวได้ง่ายตามพื้นที่ท่องเที่ยวและย่านเศรษฐกิจ",
+            "fontPx": 23.96,
+            "time": 108.027,
+            "seconds": 30.902
+          },
+          {
+            "selector": "#calc-row-1 > div:nth-of-type(1) > div:nth-of-type(1)",
+            "text": "1. ค่าสมาชิกร้านค้า (10 ร้าน)",
+            "fontPx": 23.96,
+            "time": 114.894,
+            "seconds": 24.035
+          },
+          {
+            "selector": "#calc-row-2 > div:nth-of-type(1) > div:nth-of-type(1)",
+            "text": "2. ค่าธรรมเนียมการใช้คูปอง (500 ครั้ง)",
+            "fontPx": 23.96,
+            "time": 118.063,
+            "seconds": 20.866
+          },
+          {
+            "selector": "#calc-row-3 > div:nth-of-type(1) > div:nth-of-type(1)",
+            "text": "3. City Sponsor / อปท. (Upside เพิ่มเติม)",
+            "fontPx": 23.96,
+            "time": 120.704,
+            "seconds": 18.225
+          },
+          {
+            "selector": "div.total-title",
+            "text": "รายได้รวมขั้นต้น / ย่าน (Gross Revenue)",
+            "fontPx": 25.96,
+            "time": 122.289,
+            "seconds": 16.64
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 3 text elements stay under it for 0.5 s or more, the smallest \"ระบบค้นหาเควสต์ แผนที่นำทาง และการจับ...\" at 22 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "ระบบค้นหาเควสต์ แผนที่นำทาง และการจับระยะทางจริงผ่าน Geolocation API พร้อมการนำทางของแมวเสมือน",
+        "selector": "#mcard-1 > p:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/scene6_mvp_vision.html",
+        "bbox": {
+          "x": 151.38,
+          "y": 417.82,
+          "width": 459.3,
+          "height": 98.84
+        },
+        "time": 140.25,
+        "times": [
+          140.25,
+          140.514,
+          140.778
+        ],
+        "fontPx": 21.83,
+        "floorPx": 28,
+        "seconds": 8.716,
+        "elements": [
+          {
+            "selector": "#mcard-1 > p:nth-of-type(1)",
+            "text": "ระบบค้นหาเควสต์ แผนที่นำทาง และการจับระยะทางจริงผ่าน Geolocation API พร้อมการนำทางของแมวเสมือน",
+            "fontPx": 21.83,
+            "time": 140.25,
+            "seconds": 8.716
+          },
+          {
+            "selector": "#mcard-2 > p:nth-of-type(1)",
+            "text": "ระบบเช็กพิกัดหน้าร้าน Geofence QR ใช้ครั้งเดียวแบบนับถอยหลัง และระบบตรวจจับความเร็วตัดการโกง",
+            "fontPx": 21.83,
+            "time": 140.514,
+            "seconds": 8.452
+          },
+          {
+            "selector": "#mcard-3 > p:nth-of-type(1)",
+            "text": "หน้าจอสำหรับร้านค้า ตรวจสอบยอดคนเดินมาถึงร้าน อัตราการใช้คูปอง และวิเคราะห์กลุ่มลูกค้าเรียลไทม์",
+            "fontPx": 21.83,
+            "time": 140.778,
+            "seconds": 8.188
+          }
+        ]
+      }
+    ],
+    "enabled": true,
+    "step": 0.26400000000000023,
+    "samples": 599
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

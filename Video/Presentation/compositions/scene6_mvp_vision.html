@@ -1,0 +1,309 @@
+<template>
+  <style>
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Regular.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Bold.ttf') format('truetype');
+      font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+    }
+
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Prompt', sans-serif;
+      background: radial-gradient(circle at 50% 30%, #1a233a 0%, #0d1424 70%, #060912 100%);
+      color: #f8fafc;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-size: 60px 60px;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    /* Part A: 3-Day MVP Scope (0.0 to 10.0s in scene) */
+    #mvp-part {
+      position: absolute;
+      inset: 0;
+      padding: 60px 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .mvp-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 20px;
+      background: rgba(255, 107, 53, 0.15);
+      border: 1px solid rgba(255, 107, 53, 0.4);
+      border-radius: 9999px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #ff8a5c;
+      margin-bottom: 14px;
+    }
+
+    .mvp-title {
+      font-size: 58px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .text-orange {
+      color: #ff6b35;
+    }
+
+    .mvp-cards-grid {
+      display: flex;
+      gap: 30px;
+      width: 100%;
+      max-width: 1680px;
+    }
+
+    .mvp-card {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 28px;
+      padding: 34px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
+    }
+    .mvp-card.c1 { border-top: 5px solid #ff6b35; }
+    .mvp-card.c2 { border-top: 5px solid #10b981; }
+    .mvp-card.c3 { border-top: 5px solid #38bdf8; }
+
+    .mvp-card-badge {
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+    }
+    .c1-bg { background: rgba(255, 107, 53, 0.2); }
+    .c2-bg { background: rgba(16, 185, 129, 0.2); }
+    .c3-bg { background: rgba(56, 189, 248, 0.2); }
+
+    .mvp-card-heading {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .mvp-card-desc {
+      font-size: 19px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    /* Part B: Inspiring Closing & Vision (10.0s to 19.24s) */
+    #closing-part {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0 140px;
+    }
+
+    .closing-cat-avatar {
+      width: 130px;
+      height: 130px;
+      image-rendering: pixelated;
+      margin-bottom: 24px;
+      filter: drop-shadow(0 0 25px rgba(255, 107, 53, 0.6));
+    }
+
+    .closing-quote {
+      font-size: 46px;
+      font-weight: 800;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      margin-bottom: 30px;
+    }
+    .quote-highlight {
+      background: linear-gradient(135deg, #ff6b35 0%, #f59e0b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .closing-brand-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+      padding: 12px 36px;
+      font-size: 24px;
+      font-weight: 700;
+      color: #f8fafc;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    .closing-brand-tag {
+      color: #f59e0b;
+      font-weight: 600;
+      font-size: 20px;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene6_mvp_vision" data-width="1920" data-height="1080">
+    <div class="bg-grid"></div>
+
+    <!-- Part A: MVP 3 Days (0.0 to 10.0s) -->
+    <div id="mvp-part" class="clip" data-start="0" data-duration="10.0">
+      <div id="mvp-pill-tag" class="mvp-pill">
+        <span>🚀</span>
+        <span>HACKATHON DELIVERABLES</span>
+      </div>
+      <h2 id="mvp-main-title" class="mvp-title">
+        MVP 3 วัน <span class="text-orange">พร้อมให้กรรมการและผู้ใช้ทดลองจริง</span>
+      </h2>
+
+      <div class="mvp-cards-grid">
+        <div id="mcard-1" class="mvp-card c1">
+          <div class="mvp-card-badge c1-bg">🧭</div>
+          <div class="mvp-card-heading">Live Map & GPS Tracker</div>
+          <p class="mvp-card-desc">
+            ระบบค้นหาเควสต์ แผนที่นำทาง และการจับระยะทางจริงผ่าน Geolocation API พร้อมการนำทางของแมวเสมือน
+          </p>
+        </div>
+
+        <div id="mcard-2" class="mvp-card c2">
+          <div class="mvp-card-badge c2-bg">🛡️</div>
+          <div class="mvp-card-heading">Smart Coupon & Anti-Fraud</div>
+          <p class="mvp-card-desc">
+            ระบบเช็กพิกัดหน้าร้าน Geofence QR ใช้ครั้งเดียวแบบนับถอยหลัง และระบบตรวจจับความเร็วตัดการโกง
+          </p>
+        </div>
+
+        <div id="mcard-3" class="mvp-card c3">
+          <div class="mvp-card-badge c3-bg">📊</div>
+          <div class="mvp-card-heading">B2B Merchant Dashboard</div>
+          <p class="mvp-card-desc">
+            หน้าจอสำหรับร้านค้า ตรวจสอบยอดคนเดินมาถึงร้าน อัตราการใช้คูปอง และวิเคราะห์กลุ่มลูกค้าเรียลไทม์
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Part B: Visionary Closing Quote (10.0s to 19.24s) -->
+    <div id="closing-part" class="clip" data-start="10.0" data-duration="9.24">
+      <img id="closing-cat" src="assets/cat/Walk.gif" alt="Cat Mascot" class="closing-cat-avatar" />
+
+      <h1 id="closing-quote-text" class="closing-quote">
+        “อนาคตของการเดินทาง ไม่ใช่แค่การพาคนไปถึงจุดหมาย<br />
+        แต่คือการ <span class="quote-highlight">สร้างคุณค่าให้กับทุกก้าวระหว่างทาง</span>”
+      </h1>
+
+      <div id="closing-brand-box" class="closing-brand-bar">
+        <span>🐱 Ca-Walk</span>
+        <span style="color: #64748b;">|</span>
+        <span class="closing-brand-tag">Cat Walk-to-Discover & Sweat-for-Perks Companion</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // Part A: MVP Deliverables (0 - 10s)
+    tl.fromTo(
+      "#mvp-pill-tag",
+      { opacity: 0, y: -20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      0.3
+    );
+
+    tl.fromTo(
+      "#mvp-main-title",
+      { opacity: 0, y: 25, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" },
+      0.6
+    );
+
+    tl.fromTo(
+      "#mcard-1",
+      { opacity: 0, y: 40, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "expo.out" },
+      1.0
+    );
+    tl.fromTo(
+      "#mcard-2",
+      { opacity: 0, y: 40, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "expo.out" },
+      1.3
+    );
+    tl.fromTo(
+      "#mcard-3",
+      { opacity: 0, y: 40, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "expo.out" },
+      1.6
+    );
+
+    // Fade out Part A at ~9.5s
+    tl.to(
+      "#mvp-part",
+      { opacity: 0, scale: 0.96, filter: "blur(8px)", duration: 0.5, ease: "power3.in" },
+      9.4
+    );
+
+    // Part B: Grand Finale Closing Quote (10.0 - 19.24s)
+    tl.fromTo(
+      "#closing-cat",
+      { opacity: 0, scale: 0.5, y: -30 },
+      { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "back.out(1.8)" },
+      10.2
+    );
+
+    tl.fromTo(
+      "#closing-quote-text",
+      { opacity: 0, y: 30, filter: "blur(10px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.9, ease: "expo.out" },
+      10.6
+    );
+
+    tl.fromTo(
+      "#closing-brand-box",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" },
+      11.4
+    );
+
+    window.__timelines["scene6_mvp_vision"] = tl;
+  </script>
+</template>

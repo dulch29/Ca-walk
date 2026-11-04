@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Ca-Walk Presentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: 'Prompt';
+        src: url('assets/fonts/Prompt-Regular.ttf') format('truetype');
+        font-weight: 400;
+      }
+      @font-face {
+        font-family: 'Prompt';
+        src: url('assets/fonts/Prompt-SemiBold.ttf') format('truetype');
+        font-weight: 600;
+      }
+      @font-face {
+        font-family: 'Prompt';
+        src: url('assets/fonts/Prompt-Bold.ttf') format('truetype');
+        font-weight: 700;
+      }
+      @font-face {
+        font-family: 'Prompt';
+        src: url('assets/fonts/Prompt-ExtraBold.ttf') format('truetype');
+        font-weight: 800;
+      }
+
+      :root {
+        --ground: #080d19;
+        --ink: #f8fafc;
+        --primary: #ff6b35;
+        --accent: #f59e0b;
+        --success: #10b981;
+        --alert: #ef4444;
+        --font-display: 'Prompt', sans-serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+        font-family: var(--font-display);
+      }
+
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+
+      .scene-host {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-ncsi" id="root" data-composition-id="main" data-start="0" data-duration="158.21" data-width="1920" data-height="1080" data-fps="60">
+      <video data-playback-rate="1" id="cawalk" data-hf-id="hf-fb5e4caf-0280-4612-962d-3e22e3fbdd83" class="clip" src="Cawalk.mp4" data-start="0" data-duration="158.17" data-track-index="1" data-has-audio="true" playsinline style="position: absolute; left: 0px; top: 0px; width: 1920px; height: 1080px; object-fit: contain; z-index: 8; backdrop-filter: none; opacity: 0.02"></video>
+      <!-- Master Voiceover Soundtrack from Cawalk.mp4 -->
+      
+
+      <!-- Scene 1: Hook & Brand Intro (0:00 – 0:18.23) -->
+      <div data-hf-id="hf-ke1s" id="scene1_hook" class="clip scene-host" data-composition-id="scene1_hook" data-composition-src="compositions/scene1_hook.html" data-start="0" data-duration="18.23" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Scene 2: Dual-Sided Problem (0:18.23 – 0:45.83) -->
+      <div data-hf-id="hf-9oos" id="scene2_problem" class="clip scene-host" data-composition-id="scene2_problem" data-composition-src="compositions/scene2_problem.html" data-start="18.23" data-duration="27.60" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Scene 3: Kill Features & Live App Experience (0:45.83 – 1:16.53) -->
+      <div data-hf-id="hf-r9ja" id="scene3_demo" class="clip scene-host" data-composition-id="scene3_demo" data-composition-src="compositions/scene3_demo.html" data-start="45.83" data-duration="30.70" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Scene 4: 3-Layer Anti-Fraud Shield & Cat Pocket (1:16.53 – 1:46.93) -->
+      <div data-hf-id="hf-s5ds" id="scene4_antifraud" class="clip scene-host" data-composition-id="scene4_antifraud" data-composition-src="compositions/scene4_antifraud.html" data-start="76.53" data-duration="30.40" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Scene 5: Business Model & Revenue Unit Economics (1:46.93 – 2:18.97) -->
+      <div data-hf-id="hf-7ktd" id="scene5_business" class="clip scene-host" data-composition-id="scene5_business" data-composition-src="compositions/scene5_business.html" data-start="106.93" data-duration="32.04" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Scene 6: 3-Day MVP Scope & Visionary Closing (2:18.97 – 2:38.21) -->
+      <div data-hf-id="hf-w67q" id="scene6_mvp_vision" class="clip scene-host" data-composition-id="scene6_mvp_vision" data-composition-src="compositions/scene6_mvp_vision.html" data-start="138.97" data-duration="19.24" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const mainTl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = mainTl;
+      mainTl.seek(0);
+    </script>
+  </body>
+</html>

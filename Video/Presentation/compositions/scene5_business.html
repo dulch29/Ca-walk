@@ -1,0 +1,557 @@
+<template>
+  <style>
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Regular.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Bold.ttf') format('truetype');
+      font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+    }
+
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Prompt', sans-serif;
+      background: radial-gradient(circle at 50% 25%, #162035 0%, #0c1424 70%, #050810 100%);
+      color: #f8fafc;
+      padding: 50px 90px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-size: 60px 60px;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    .top-header {
+      text-align: center;
+      margin-bottom: 30px;
+      z-index: 10;
+    }
+
+    .biz-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 20px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 9999px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #6ee7b7;
+      margin-bottom: 14px;
+    }
+
+    .main-title {
+      font-size: 58px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .highlight-green {
+      color: #10b981;
+    }
+    .subtitle {
+      font-size: 24px;
+      color: #94a3b8;
+      margin-top: 6px;
+    }
+
+    /* Main Grid: Left Revenue Streams & Math, Right Visual Bar & Expansion map */
+    .biz-content {
+      display: flex;
+      gap: 50px;
+      width: 100%;
+      height: 800px;
+      z-index: 10;
+    }
+
+    /* Left Side: Formula & Breakdown Table */
+    .math-col {
+      width: 950px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stream-cards-row {
+      display: flex;
+      gap: 20px;
+    }
+
+    .stream-card {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 22px 28px;
+    }
+    .stream-card.sub {
+      border-top: 4px solid #38bdf8;
+    }
+    .stream-card.redeem {
+      border-top: 4px solid #f59e0b;
+    }
+
+    .stream-tag {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .stream-card.sub .stream-tag { color: #38bdf8; }
+    .stream-card.redeem .stream-tag { color: #f59e0b; }
+
+    .stream-rate {
+      font-size: 32px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .stream-desc {
+      font-size: 17px;
+      color: #94a3b8;
+    }
+
+    /* Calculation Formula Box */
+    .calc-box {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 28px 34px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .calc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .calc-label {
+      font-size: 22px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    .calc-math {
+      font-size: 22px;
+      font-weight: 500;
+      color: #94a3b8;
+    }
+    .calc-val {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .calc-total-banner {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.08) 100%);
+      border: 2px solid rgba(16, 185, 129, 0.6);
+      border-radius: 18px;
+      padding: 18px 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+    .total-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #a7f3d0;
+    }
+    .total-num {
+      font-size: 42px;
+      font-weight: 800;
+      color: #10b981;
+      text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    }
+
+    /* Right Side: Visual Bar Chart & District Expansion */
+    .visual-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .chart-panel {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 24px 28px;
+      height: 380px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .chart-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .bars-container {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      height: 240px;
+      padding-top: 20px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+      position: relative;
+    }
+
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 140px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .bar-rect {
+      width: 110px;
+      border-radius: 12px 12px 0 0;
+      position: relative;
+      transform-origin: bottom center;
+    }
+    .bar-rect.blue-bar {
+      height: 170px;
+      background: linear-gradient(to top, #0284c7, #38bdf8);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+    .bar-rect.yellow-bar {
+      height: 70px;
+      background: linear-gradient(to top, #d97706, #fbbf24);
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+    }
+
+    .bar-number {
+      position: absolute;
+      top: -34px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .bar-label-text {
+      margin-top: 14px;
+      font-size: 17px;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-align: center;
+    }
+
+    /* District Rollout Card (1:38 - 1:45 voiceover sync) */
+    .expansion-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 24px 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .exp-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ff6b35;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .districts-flow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .district-node {
+      padding: 10px 18px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .district-node.hub {
+      background: rgba(255, 107, 53, 0.2);
+      border-color: #ff6b35;
+      color: #ff9d75;
+      box-shadow: 0 0 15px rgba(255, 107, 53, 0.4);
+    }
+    .node-arrow {
+      color: #64748b;
+      font-size: 16px;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene5_business" data-width="1920" data-height="1080">
+    <div class="bg-grid"></div>
+
+    <div id="biz-top-header" class="top-header clip" data-start="0" data-duration="32.04">
+      <div id="biz-pill-tag" class="biz-pill">
+        <span>📈</span>
+        <span>SUSTAINABLE UNIT ECONOMICS</span>
+      </div>
+      <h2 id="biz-heading" class="main-title">
+        รายได้ประมาณ <span class="highlight-green">14,000 บาท/เดือน ต่อ 1 ย่าน</span>
+      </h2>
+      <p id="biz-sub" class="subtitle">
+        โมเดลธุรกิจชัดเจน ขยายตัวได้ง่ายตามพื้นที่ท่องเที่ยวและย่านเศรษฐกิจ
+      </p>
+    </div>
+
+    <div id="biz-main-content" class="biz-content clip" data-start="0" data-duration="32.04">
+      <!-- Left Column: Math & Streams -->
+      <div class="math-col">
+        <!-- 2 Streams (Sync with 1:20 - 1:28 voiceover -> 0 to 8s in scene) -->
+        <div class="stream-cards-row">
+          <div id="scard-sub" class="stream-card sub">
+            <div class="stream-tag">Merchant Subscription</div>
+            <div class="stream-rate">500 – 2,000 ฿</div>
+            <div class="stream-desc">ต่อร้านค้า / เดือน (เฉลี่ย 1,000 ฿)</div>
+          </div>
+
+          <div id="scard-redeem" class="stream-card redeem">
+            <div class="stream-tag">Pay-per-Redeem</div>
+            <div class="stream-rate">5 – 10 ฿</div>
+            <div class="stream-desc">ต่อการใช้คูปองจริง (เฉลี่ย 8 ฿)</div>
+          </div>
+        </div>
+
+        <!-- Calculation Simulation (Sync with 1:28 - 1:38 voiceover -> ~8s to 18s in scene) -->
+        <div id="calc-panel" class="calc-box">
+          <div id="calc-row-1" class="calc-row">
+            <div>
+              <div class="calc-label">1. ค่าสมาชิกร้านค้า (10 ร้าน)</div>
+              <div class="calc-math">10 ร้านค้า × 1,000 บาท/เดือน</div>
+            </div>
+            <div class="calc-val">10,000 บาท</div>
+          </div>
+
+          <div id="calc-row-2" class="calc-row">
+            <div>
+              <div class="calc-label">2. ค่าธรรมเนียมการใช้คูปอง (500 ครั้ง)</div>
+              <div class="calc-math">500 สิทธิ์ × 8 บาท/ครั้ง</div>
+            </div>
+            <div class="calc-val">4,000 บาท</div>
+          </div>
+
+          <div id="calc-row-3" class="calc-row" style="border:none; padding-bottom:0;">
+            <div>
+              <div class="calc-label">3. City Sponsor / อปท. (Upside เพิ่มเติม)</div>
+              <div class="calc-math">สปอนเซอร์เส้นทางเควสต์ & ชุมชนท่องเที่ยว</div>
+            </div>
+            <div class="calc-val" style="color: #38bdf8;">+ Upside</div>
+          </div>
+
+          <div id="total-banner-box" class="calc-total-banner">
+            <div>
+              <div class="total-title">รายได้รวมขั้นต้น / ย่าน (Gross Revenue)</div>
+              <div style="font-size: 17px; color: #94a3b8;">ก่อนหักต้นทุนเซิร์ฟเวอร์และการตลาด</div>
+            </div>
+            <div class="total-num">14,000 ฿/ด.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Visual Chart & District Expansion -->
+      <div class="visual-col">
+        <div id="chart-card-box" class="chart-panel">
+          <div class="chart-title">สัดส่วนรายได้ต่อย่าน (บาท/เดือน)</div>
+          <div class="bars-container">
+            <div class="bar-group">
+              <div id="bar-sub" class="bar-rect blue-bar">
+                <span class="bar-number">10k</span>
+              </div>
+              <div class="bar-label-text">Merchant Sub<br/>(10 ร้าน)</div>
+            </div>
+
+            <div class="bar-group">
+              <div id="bar-redeem" class="bar-rect yellow-bar">
+                <span class="bar-number">4k</span>
+              </div>
+              <div class="bar-label-text">Pay-per-Redeem<br/>(500 สิทธิ์)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expansion Map (Sync with 1:38 - 1:45 voiceover -> ~18s to 32s in scene) -->
+        <div id="district-exp-box" class="expansion-card">
+          <div class="exp-title">
+            <span>📍</span>
+            <span>Hyper-Local Expansion: เริ่มจากหนาแน่นแล้วขยาย</span>
+          </div>
+          <div class="districts-flow">
+            <div class="district-node hub">🎯 1. บรรทัดทอง-สามย่าน (Sandbox)</div>
+            <span class="node-arrow">➔</span>
+            <div class="district-node">2. อารีย์</div>
+            <span class="node-arrow">➔</span>
+            <div class="district-node">3. ทรงวาด</div>
+            <span class="node-arrow">➔</span>
+            <div class="district-node">4. สยาม</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // Header Entrance
+    tl.fromTo(
+      "#biz-pill-tag",
+      { opacity: 0, y: -20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      0.3
+    );
+
+    tl.fromTo(
+      "#biz-heading",
+      { opacity: 0, y: 25, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" },
+      0.6
+    );
+
+    tl.fromTo(
+      "#biz-sub",
+      { opacity: 0, y: 15 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" },
+      0.9
+    );
+
+    // 2 Stream Cards Entrance (0.9 to 2.0s in scene)
+    tl.fromTo(
+      "#scard-sub",
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      1.1
+    );
+
+    tl.fromTo(
+      "#scard-redeem",
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      1.5
+    );
+
+    // Right Chart Panel Entrance
+    tl.fromTo(
+      "#chart-card-box",
+      { opacity: 0, x: 40 },
+      { opacity: 1, x: 0, duration: 0.7, ease: "expo.out" },
+      1.8
+    );
+
+    // Bars rise up
+    tl.fromTo(
+      "#bar-sub",
+      { scaleY: 0 },
+      { scaleY: 1, duration: 0.8, ease: "expo.out" },
+      2.2
+    );
+    tl.fromTo(
+      "#bar-redeem",
+      { scaleY: 0 },
+      { scaleY: 1, duration: 0.8, ease: "expo.out" },
+      2.6
+    );
+
+    // Calculation rows reveal synchronized with voiceover (at ~7s into scene)
+    tl.fromTo(
+      "#calc-panel",
+      { opacity: 0, y: 40 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+      7.0
+    );
+
+    tl.fromTo(
+      "#calc-row-1",
+      { opacity: 0, x: -20 },
+      { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" },
+      7.8
+    );
+
+    tl.fromTo(
+      "#calc-row-2",
+      { opacity: 0, x: -20 },
+      { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" },
+      11.0
+    );
+
+    tl.fromTo(
+      "#calc-row-3",
+      { opacity: 0, x: -20 },
+      { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" },
+      13.5
+    );
+
+    // Total Banner pop with green glow
+    tl.fromTo(
+      "#total-banner-box",
+      { opacity: 0, scale: 0.92 },
+      { opacity: 1, scale: 1, duration: 0.7, ease: "back.out(1.6)" },
+      15.0
+    );
+
+    // District Expansion Entrance (voiceover at ~18s into scene -> "เราเริ่มจากพื้นที่เล็กๆ...")
+    tl.fromTo(
+      "#district-exp-box",
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" },
+      19.0
+    );
+
+    tl.fromTo(
+      ".districts-flow .district-node",
+      { opacity: 0, scale: 0.8 },
+      { opacity: 1, scale: 1, duration: 0.4, stagger: 0.15, ease: "back.out(1.5)" },
+      20.0
+    );
+
+    // Exit transition
+    tl.to(
+      "#root",
+      { opacity: 0, scale: 0.97, filter: "blur(6px)", duration: 0.45, ease: "power3.in" },
+      31.5
+    );
+
+    window.__timelines["scene5_business"] = tl;
+  </script>
+</template>

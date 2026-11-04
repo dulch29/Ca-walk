@@ -1,0 +1,441 @@
+<template>
+  <style>
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Regular.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Bold.ttf') format('truetype');
+      font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+    }
+
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Prompt', sans-serif;
+      background: radial-gradient(circle at 50% 25%, #182236 0%, #0d1526 70%, #060912 100%);
+      color: #f8fafc;
+      padding: 50px 90px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-size: 60px 60px;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    .top-header {
+      text-align: center;
+      margin-bottom: 36px;
+      z-index: 10;
+    }
+
+    .security-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 20px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 9999px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #6ee7b7;
+      margin-bottom: 14px;
+    }
+
+    .main-title {
+      font-size: 58px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .highlight-green {
+      color: #10b981;
+    }
+    .highlight-red {
+      color: #ef4444;
+    }
+
+    /* Content Area: Left side 24-72h pocket + Right side 3 Shields */
+    .content-split {
+      display: flex;
+      gap: 50px;
+      width: 100%;
+      height: 780px;
+      z-index: 10;
+    }
+
+    /* Left Column: Pocket & Flexibility */
+    .pocket-col {
+      width: 580px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .pocket-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-top: 4px solid #ff6b35;
+      border-radius: 28px;
+      padding: 36px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .pocket-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .pocket-icon-badge {
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 107, 53, 0.2);
+      border: 1px solid rgba(255, 107, 53, 0.5);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+    .pocket-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .pocket-time-tag {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-top: 4px;
+    }
+
+    .pocket-quote {
+      font-size: 22px;
+      font-weight: 500;
+      color: #e2e8f0;
+      line-height: 1.5;
+      background: rgba(15, 23, 42, 0.6);
+      border-left: 4px solid #f59e0b;
+      padding: 16px 20px;
+      border-radius: 12px;
+    }
+
+    .mode-badges-box {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .mode-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+    }
+    .mode-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .mode-distance {
+      font-size: 18px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    /* Right Column: 3-Layer Anti-Fraud Shield Stack */
+    .shields-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .shield-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .shield-card.layer-1 {
+      border-left: 6px solid #10b981;
+    }
+    .shield-card.layer-2 {
+      border-left: 6px solid #f59e0b;
+    }
+    .shield-card.layer-3 {
+      border-left: 6px solid #ef4444;
+    }
+
+    .shield-num-badge {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .layer-1-badge {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+    }
+    .layer-2-badge {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fbbf24;
+    }
+    .layer-3-badge {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #f87171;
+    }
+
+    .shield-text-content {
+      flex: 1;
+    }
+
+    .shield-headline {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .shield-detail {
+      font-size: 19px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .shield-tech-pill {
+      font-size: 15px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      font-weight: 500;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene4_antifraud" data-width="1920" data-height="1080">
+    <div class="bg-grid"></div>
+
+    <div id="af-top-header" class="top-header clip" data-start="0" data-duration="30.4">
+      <div id="af-pill" class="security-pill">
+        <span>🛡️</span>
+        <span>MERCHANT TRUST & VERIFIABILITY</span>
+      </div>
+      <h2 id="af-heading" class="main-title">
+        ใช้ได้จริง และ <span class="highlight-red">โกงไม่ได้</span> ด้วยระบบป้องกัน 3 ชั้น
+      </h2>
+    </div>
+
+    <div id="af-content-split" class="content-split clip" data-start="0" data-duration="30.4">
+      <!-- Left: 24-72h Cat Pocket Window -->
+      <div class="pocket-col">
+        <div id="pocket-main-card" class="pocket-card">
+          <div class="pocket-header">
+            <div class="pocket-icon-badge">🛍️</div>
+            <div>
+              <div class="pocket-title">Cat Pocket: เก็บไว้ใช้ได้</div>
+              <div class="pocket-time-tag">⏱️ ภายใน 24 – 72 ชั่วโมง</div>
+            </div>
+          </div>
+
+          <div id="pocket-quote-box" class="pocket-quote">
+            “ไม่จำเป็นต้องรีบเข้าร้านทันทีหลังวิ่งเสร็จ กลับไปอาบน้ำก่อนได้ แยกเวลาวิ่งออกจากเวลาใช้เงิน”
+          </div>
+
+          <div class="mode-badges-box">
+            <div id="mode-walk" class="mode-pill">
+              <span class="mode-name">🚶 1. เดินชิลสำรวจเมือง</span>
+              <span class="mode-distance">400 ม. – 2 กม.</span>
+            </div>
+            <div id="mode-run" class="mode-pill">
+              <span class="mode-name">🏃 2. วิ่งสะสมระยะทาง</span>
+              <span class="mode-distance">12 กม. / 7 วัน</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: 3 Anti-Fraud Shields -->
+      <div class="shields-col">
+        <!-- Shield 1: Geofence Lock -->
+        <div id="shield-1" class="shield-card layer-1">
+          <div class="shield-num-badge layer-1-badge">1</div>
+          <div class="shield-text-content">
+            <div class="shield-headline">
+              <span>Geofence Lock: ตรวจพิกัดหน้าร้านจริง</span>
+              <span class="shield-tech-pill">GPS &lt; 50m</span>
+            </div>
+            <p class="shield-detail">
+              ปุ่มกดใช้คูปองจะปลดล็อกเฉพาะเมื่อผู้ใช้อยู่ในรัศมีพิกัดหน้าร้านจริงเท่านั้น กันการแลกสิทธิ์จากที่บ้าน
+            </p>
+          </div>
+          <span style="font-size: 36px;">📍</span>
+        </div>
+
+        <!-- Shield 2: One-Time Dynamic QR -->
+        <div id="shield-2" class="shield-card layer-2">
+          <div class="shield-num-badge layer-2-badge">2</div>
+          <div class="shield-text-content">
+            <div class="shield-headline">
+              <span>One-Time Dynamic QR: ผูก User ID</span>
+              <span class="shield-tech-pill">Time-limited Token</span>
+            </div>
+            <p class="shield-detail">
+              มีเวลานับถอยหลังจำกัด ป้องกันการแคปภาพหน้าจอส่งต่อให้เพื่อน หรือวนใช้ซ้ำ
+            </p>
+          </div>
+          <span style="font-size: 36px;">📲</span>
+        </div>
+
+        <!-- Shield 3: Pace Anomaly Detection -->
+        <div id="shield-3" class="shield-card layer-3">
+          <div class="shield-num-badge layer-3-badge">3</div>
+          <div class="shield-text-content">
+            <div class="shield-headline">
+              <span>Pace Anomaly Detection: ตรวจจับความเร็ว</span>
+              <span class="shield-tech-pill">Cat Warning &gt; 18 km/h</span>
+            </div>
+            <p class="shield-detail">
+              เตือนและตัดสิทธิ์ทันทีหากพบความเร็วเกินปกติ กันการขี่มอเตอร์ไซค์ รถยนต์ หรือโกง GPS ปั๊มระยะ
+            </p>
+          </div>
+          <span style="font-size: 36px;">🚨</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // Header Entrance
+    tl.fromTo(
+      "#af-pill",
+      { opacity: 0, y: -20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      0.3
+    );
+
+    tl.fromTo(
+      "#af-heading",
+      { opacity: 0, y: 25, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" },
+      0.6
+    );
+
+    // Left Pocket Card Entrance
+    tl.fromTo(
+      "#pocket-main-card",
+      { opacity: 0, x: -50, scale: 0.95 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.8, ease: "expo.out" },
+      1.0
+    );
+
+    tl.fromTo(
+      "#mode-walk, #mode-run",
+      { opacity: 0, y: 15 },
+      { opacity: 1, y: 0, duration: 0.4, stagger: 0.15, ease: "power2.out" },
+      1.6
+    );
+
+    // Right Shields: 3-Layer reveal synchronized with voiceover
+    // Voiceover explains Layer 1 (Geofence) at ~3s - 8s into scene
+    tl.fromTo(
+      "#shield-1",
+      { opacity: 0, x: 60, scale: 0.95 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.7, ease: "expo.out" },
+      2.2
+    );
+
+    // Voiceover explains Layer 2 (One-Time QR) at ~8s - 14s into scene
+    tl.fromTo(
+      "#shield-2",
+      { opacity: 0, x: 60, scale: 0.95 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.7, ease: "expo.out" },
+      8.0
+    );
+
+    // Voiceover explains Layer 3 (Pace Anomaly) at ~14s - 20s into scene
+    tl.fromTo(
+      "#shield-3",
+      { opacity: 0, x: 60, scale: 0.95 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.7, ease: "expo.out" },
+      14.0
+    );
+
+    // Highlight Pocket quote when voiceover mentions "ไม่จำเป็นต้องรีบเข้าร้านทันที" around 20s
+    tl.to(
+      "#pocket-quote-box",
+      {
+        borderColor: "#ff6b35",
+        backgroundColor: "rgba(255, 107, 53, 0.15)",
+        scale: 1.03,
+        duration: 0.6,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.inOut"
+      },
+      20.5
+    );
+
+    // Exit transition
+    tl.to(
+      "#root",
+      { opacity: 0, scale: 0.97, filter: "blur(6px)", duration: 0.45, ease: "power3.in" },
+      29.9
+    );
+
+    window.__timelines["scene4_antifraud"] = tl;
+  </script>
+</template>

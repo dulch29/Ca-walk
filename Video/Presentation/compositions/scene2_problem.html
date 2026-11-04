@@ -1,0 +1,376 @@
+<template>
+  <style>
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Regular.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-Bold.ttf') format('truetype');
+      font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Prompt';
+      src: url('assets/fonts/Prompt-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+    }
+
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Prompt', sans-serif;
+      background: radial-gradient(circle at 50% 25%, #182234 0%, #0d1424 70%, #070a12 100%);
+      color: #f8fafc;
+      padding: 60px 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-size: 60px 60px;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    .header-block {
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 50px;
+      z-index: 10;
+    }
+
+    .section-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 20px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 9999px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fca5a5;
+      margin-bottom: 16px;
+    }
+
+    .main-title {
+      font-size: 64px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .highlight-red {
+      color: #ef4444;
+    }
+    .subtitle {
+      font-size: 26px;
+      color: #94a3b8;
+      margin-top: 10px;
+    }
+
+    /* 2 Columns: User Side vs Merchant Side */
+    .cards-row {
+      display: flex;
+      gap: 60px;
+      width: 100%;
+      max-width: 1680px;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .pain-card {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.65);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 32px;
+      padding: 44px 48px;
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .pain-card.user-card {
+      border-top: 4px solid #f59e0b;
+    }
+    .pain-card.merchant-card {
+      border-top: 4px solid #ef4444;
+    }
+
+    .card-top-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .card-avatar-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+    }
+    .user-avatar-bg {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .merchant-avatar-bg {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .card-role-title {
+      font-size: 34px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .card-role-sub {
+      font-size: 20px;
+      color: #94a3b8;
+    }
+
+    .pain-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 24px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 20px 24px;
+    }
+
+    .item-bullet {
+      font-size: 26px;
+      line-height: 1;
+      margin-top: 4px;
+    }
+
+    .item-heading {
+      font-size: 24px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+    }
+
+    .item-desc {
+      font-size: 20px;
+      color: #94a3b8;
+      line-height: 1.45;
+    }
+
+    /* Comparison Badge at center or bottom */
+    .vs-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 70px;
+      height: 70px;
+      background: #0f172a;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      color: #94a3b8;
+      z-index: 20;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene2_problem" data-width="1920" data-height="1080">
+    <div class="bg-grid"></div>
+
+    <div id="problem-header-block" class="header-block clip" data-start="0" data-duration="27.6">
+      <div id="problem-pill" class="section-pill">
+        <span>⚠️</span>
+        <span>THE DUAL-SIDED DILEMMA</span>
+      </div>
+      <h2 id="problem-heading" class="main-title">
+        ผู้ใช้เบื่อ ร้านค้าเสียเงิน <span class="highlight-red">แต่ตลาดกลับใหญ่มาก</span>
+      </h2>
+      <p id="problem-sub" class="subtitle">
+        ปัญหาของคนเมืองที่อยากเดินสำรวจ กับร้านค้าชุมชนที่เรียกร้องลูกค้าหน้าร้านจริง
+      </p>
+    </div>
+
+    <div id="problem-cards-row" class="cards-row clip" data-start="0" data-duration="27.6">
+      <!-- Left Card: User Side (0.5 to 13s into scene) -->
+      <div id="user-pain-card" class="pain-card user-card">
+        <div class="card-top-header">
+          <div class="card-title-group">
+            <div class="card-avatar-icon user-avatar-bg">🚶</div>
+            <div>
+              <div class="card-role-title">ฝั่งผู้ใช้ (Walkers)</div>
+              <div class="card-role-sub">คนเดินเล่น & สายสุขภาพในเมือง</div>
+            </div>
+          </div>
+          <span style="font-size: 28px;">🤔</span>
+        </div>
+
+        <div id="user-pain-1" class="pain-item">
+          <div class="item-bullet">❌</div>
+          <div>
+            <div class="item-heading">อยากเดินชิลสำรวจเมือง แต่ไม่รู้จะไปไหน</div>
+            <div class="item-desc">ขาดแรงจูงใจ เส้นทางน่าเบื่อ เดินวนที่เดิม ไม่มีเป้าหมายที่สนุก</div>
+          </div>
+        </div>
+
+        <div id="user-pain-2" class="pain-item">
+          <div class="item-bullet">❌</div>
+          <div>
+            <div class="item-heading">แอปวิ่งทั่วไป (Strava, Nike) จริงจังเกินไป</div>
+            <div class="item-desc">โฟกัส Pace และระยะทางมาราธอน ไม่เหมาะกับสาย City Exploration และคนทั่วไป</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Card: Merchant Side (13s to 27.6s into scene) -->
+      <div id="merchant-pain-card" class="pain-card merchant-card">
+        <div class="card-top-header">
+          <div class="card-title-group">
+            <div class="card-avatar-icon merchant-avatar-bg">🏪</div>
+            <div>
+              <div class="card-role-title">ฝั่งร้านค้า (Local Merchants)</div>
+              <div class="card-role-sub">ร้านอาหาร คาเฟ่ ธุรกิจในย่าน</div>
+            </div>
+          </div>
+          <span style="font-size: 28px;">💸</span>
+        </div>
+
+        <div id="merchant-pain-1" class="pain-item">
+          <div class="item-bullet">💸</div>
+          <div>
+            <div class="item-heading">จ่ายโฆษณาแพง ไม่การันตีคนเดินเข้าร้านจริง</div>
+            <div class="item-desc">ยิง Ads Facebook/IG คนเห็นเยอะแต่เลื่อนผ่าน ไม่เกิด Walk-in traffic หน้าร้าน</div>
+          </div>
+        </div>
+
+        <div id="merchant-pain-2" class="pain-item">
+          <div class="item-bullet">⚠️</div>
+          <div>
+            <div class="item-heading">แคมเปญแจกคูปองทั่วไป เสี่ยงโดนโกง & กดดันกำไร</div>
+            <div class="item-desc">แคปรูปแจกต่อ ไม่รู้ว่ามาหน้าร้านจริงไหม และการลด 50% ทำร้ายกำไรร้านค้าในระยะยาว</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // Scene Header
+    tl.fromTo(
+      "#problem-pill",
+      { opacity: 0, y: -20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      0.3
+    );
+
+    tl.fromTo(
+      "#problem-heading",
+      { opacity: 0, y: 25, filter: "blur(6px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" },
+      0.6
+    );
+
+    tl.fromTo(
+      "#problem-sub",
+      { opacity: 0, y: 15 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" },
+      0.9
+    );
+
+    // Left Card (User Pain Points - syncs with 18.23s - 32s master time -> 0.0 - 13.8s in scene)
+    tl.fromTo(
+      "#user-pain-card",
+      { opacity: 0, x: -60, scale: 0.95 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.8, ease: "expo.out" },
+      1.2
+    );
+
+    tl.fromTo(
+      "#user-pain-1",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      2.0
+    );
+
+    tl.fromTo(
+      "#user-pain-2",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      5.5
+    );
+
+    // Right Card (Merchant Pain Points - syncs with 32s - 45.83s master time -> ~13.8s in scene)
+    tl.fromTo(
+      "#merchant-pain-card",
+      { opacity: 0, x: 60, scale: 0.95 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.8, ease: "expo.out" },
+      12.5
+    );
+
+    tl.fromTo(
+      "#merchant-pain-1",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      13.5
+    );
+
+    tl.fromTo(
+      "#merchant-pain-2",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      18.5
+    );
+
+    // Pulse highlight on merchant card when talking about ad loss
+    tl.to(
+      "#merchant-pain-card",
+      { boxShadow: "0 0 40px rgba(239, 68, 68, 0.4)", duration: 0.6, yoyo: true, repeat: 1 },
+      14.0
+    );
+
+    // Exit transition
+    tl.to(
+      "#root",
+      { opacity: 0, scale: 0.97, filter: "blur(6px)", duration: 0.45, ease: "power3.in" },
+      27.1
+    );
+
+    window.__timelines["scene2_problem"] = tl;
+  </script>
+</template>
